@@ -154,7 +154,7 @@ int main(){
 "@ | Out-File src/main.cpp -Encoding utf8
 
 # CMakeLists.txt
-    @"
+$cmake = @'
 #═══════════════════════════════════════════════════════════════════════════════
 # 🧱 CONFIGURAÇÃO MÍNIMA DO CMAKE
 # ------------------------------------------------------------------------------
@@ -167,7 +167,7 @@ cmake_minimum_required(VERSION 3.20)
 # ------------------------------------------------------------------------------
 # Nome do projeto e linguagem utilizada.
 # O nome do executável final será o mesmo do projeto.
-project($ProjectName LANGUAGES CXX)
+project(__PROJECT_NAME__ LANGUAGES CXX)
 
 #═══════════════════════════════════════════════════════════════════════════════
 # 🔢 CONFIGURAÇÕES DA LINGUAGEM C++
@@ -249,7 +249,7 @@ endif()
 # - Mantém a janela aberta após a execução (/k)
 #
 # Execução:
-#   cmake --build . --target run
+# cmake --build . --target run
 #
 # Implementação:
 # - Usa o PowerShell para iniciar um novo processo (Start-Process)
@@ -268,7 +268,9 @@ if (WIN32)
         VERBATIM
     )
 endif()
-"@ | Out-File CMakeLists.txt -Encoding utf8
+'@ 
+$cmake = $cmake -replace '__PROJECT_NAME__', $ProjectName
+$cmake | Out-File CMakeLists.txt -Encoding utf8
 
 # .gitignore
     @"
