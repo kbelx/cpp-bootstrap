@@ -1,26 +1,6 @@
-# C++ Project Generator (PowerShell)
+# C++ Bootstrap
+Gerador em PowerShell para criar projetos C++ com CMake, estrutura padronizada e arquivos prontos para desenvolvimento.
 
-Script em PowerShell para gerar automaticamente projetos C++ com:
+Use [`install.ps1`](install.ps1) uma vez para habilitar o comando global `cpp-bootstrap` no terminal.
 
-- Estrutura padrão (`src/`, `include/`, `.vscode/`)
-- CMake configurado com C++23
-- Integração com clangd e compile_commands.json
-- Ambiente MSYS2 (GCC) + VS Code
-
----
-
-## Uso
-
-```powershell
-./criar_projeto_cpp.ps1 MeuProjeto
-```
-
----
-## Requisitos
-
-- Windows
-- PowerShell 7+ (ou Windows PowerShell)
-- CMake
-- MSYS2 (UCRT64)
-- VS Code + extensões CMake Tools e clangd
-
+A documentação principal fica em [docs/Documentação_Principal.md](docs/Documentação_Principal.md).

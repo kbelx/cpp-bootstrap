@@ -1,21 +1,49 @@
+<#
+.SYNOPSIS
+Cria um novo projeto C++ com estrutura padrão.
+
+.DESCRIPTION
+Gera diretórios src/, include/, .vscode/
+e configura CMake com C++23.
+
+.PARAMETER ProjectName
+Nome do projeto a ser criado.
+
+.EXAMPLE
+./cpp_bootstrap.ps1 MeuProjeto
+
+.EXAMPLE
+cpp-bootstrap MeuProjeto
+#>
+
 param (
     [string]$ProjectName
 )
 
-$ErrorActionPreference = "Stop"
+$ErrorActionPreference = "Stop";
+
+# Usa as variaveis automaticas do PowerShell para detectar o sistema operacional.
+# Nao atribua a $IsWindows, $IsLinux ou $IsMacOS; elas sao read-only.
+
+#============================== [ TUTORIAL ] ===================================
 
 if (-not $ProjectName) {
     Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    Write-Host "Siga esses passos para gerar o projeto:"
-    Write-Host "1. Coloque o 'criar_projeto_cpp.ps1' em alguma pasta;"
-    Write-Host "2. Abra o terminal na pasta;"
-    Write-Host "3. Rode: ./criar_projeto_cpp.ps1 NomeDoProjeto"
-    Write-Host "4. NÃO INCLUA '<>'"
+    Write-Host "Uso:"
+
+    if ($IsWindows) {
+        Write-Host "  ./cpp_bootstrap.ps1 NomeDoProjeto"
+    } else {
+        Write-Host "  pwsh ./cpp_bootstrap.ps1 NomeDoProjeto"
+    }
+
+    Write-Host ""
+    Write-Host "Dica: use apenas o nome real do projeto, sem < >."
     Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     exit 1
 }
 
-#============================ [ PALETA / FUNÇÕES ] ============================
+#============================ [ PALETA / FUNÇÕES ] =============================
 
 $RESET  = "`e[0m"
 $GREEN  = "`e[32m"
@@ -31,56 +59,98 @@ function Write-ErrorMsg($msg) { Write-Host "$RED$msg$RESET" }
 
 #============================ [ VALIDAÇÃO DO NOME ] ============================
 
-$ProjectName = $ProjectName.Trim().Trim('"').Trim("'")
+function validar_NomeProjeto {
+    param([string]$ProjectName)
+    $ProjectName = $ProjectName.Trim().Trim('"').Trim("'")
+    $line = "$GRAY━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━$RESET"
+    
+    
+    # 1 - Encerra o programa caso NOME ESTEJA VAZIO.
+    if ([string]::IsNullOrWhiteSpace($ProjectName)) {
+        Write-ErrorMsg "❌ Nome do projeto vazio.";
+        Write-Info "✅ Exemplo local: ./cpp_bootstrap.ps1 MeuProjeto";
+        Write-Info "✅ Exemplo global: cpp-bootstrap MeuProjeto";
 
-if ([string]::IsNullOrWhiteSpace($ProjectName)) {
-    Write-ErrorMsg "❌ Nome do projeto vazio."
-    Write-Info "✅ Exemplo: ./criar_projeto_cpp.ps1 MeuProjeto"
+        return $false
+    } 
+    
+    
+    # 2 - Encerra o programa caso o nome tenha CARACTERES PROIBIDOS.
+    if ($IsWindows){
+        $badFound = $ProjectName.ToCharArray() | Where-Object { [System.IO.Path]::GetInvalidFileNameChars() -contains $_ }
+        if ($badFound.Count -gt 0) {
+
+            $badList = ($badFound | Select-Object -Unique) -join " "
+
+            Write-Host $line;
+            Write-ErrorMsg "❌ Nome inválido: '$ProjectName'";
+            Write-Warn "Caracteres proibidos encontrados: $badList";
+            Write-Info "Use apenas letras, números, '_' e '-' (recomendado).";
+            Write-Host $line;
+            
+            return $false
+        }
+        
+    } else {
+        # Linux e macOS: evitar apenas / e null byte
+        if($ProjectName -match '[/\x00]'){
+            
+            Write-Host $line;
+            Write-ErrorMsg "❌ Nome inválido: '$ProjectName'";
+            Write-Warn "Não pode conter: / ou caracteres nulos";
+            Write-Host $line;
+            
+            return $false
+        }
+    }
+    
+
+    # [WINDOWS] Encerra o programa caso NOME TERMINAR COM PONTO ou ESPAÇO.
+    if ($ProjectName -match '[\.\s]$') {
+
+        Write-Host $line;
+        Write-ErrorMsg "❌ Nome inválido: '$ProjectName'";
+        Write-Warn "No Windows, nomes de pasta não podem terminar com '.' ou espaço.";
+        Write-Host $line;
+
+        return $false
+    }
+    
+    # [WINDOWS] Encerra o programa caso NOME DO PROJETO tenha NOMES RESERVADOS ( Keywords do SO)
+    $baseName = ($ProjectName.Split('.')[0]).ToUpperInvariant();
+    $reserved = @("CON","PRN","AUX","NUL","COM1","COM2","COM3","COM4",
+                  "COM5","COM6","COM7","COM8","COM9","LPT1","LPT2","LPT3",
+                  "LPT4","LPT5","LPT6","LPT7","LPT8","LPT9");
+    if ($reserved -contains $baseName) {
+
+        Write-Host $line;
+        Write-ErrorMsg "❌ Nome inválido: '$ProjectName'";
+        Write-Warn "Esse é um nome reservado do Windows.";
+        Write-Info "Escolha outro (ex: '${ProjectName}_proj').";
+        Write-Host $line;
+
+        return $false
+    }
+    
+    # Encerra o programa caso JÁ EXISTA O MESMO NOME.
+    if (Test-Path -LiteralPath $ProjectName -PathType Container) {
+        Write-Host $line;
+        Write-ErrorMsg "❌ Já existe uma pasta com o nome: '$ProjectName'";
+        Write-Info "Sugestões:";
+        Write-Info "  • Use outro nome: cpp-bootstrap ${ProjectName}_2";
+        Write-Info "  • Ou renomeie/apague a pasta existente.";
+        Write-Host $line;
+
+        return $false
+    }
+
+    return $true 
+}
+
+# Executar validação
+if (-not (validar_NomeProjeto $ProjectName)){
     exit 2
 }
-
-$invalidChars = [System.IO.Path]::GetInvalidFileNameChars()
-$badFound = $ProjectName.ToCharArray() | Where-Object { $invalidChars -contains $_ }
-
-if ($badFound.Count -gt 0) {
-    $badList = ($badFound | Select-Object -Unique) -join " "
-    Write-Host "$GRAY━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━$RESET"
-    Write-ErrorMsg "❌ Nome inválido: '$ProjectName'"
-    Write-Warn "Caracteres proibidos encontrados: $badList"
-    Write-Info "Use apenas letras, números, '_' e '-' (recomendado)."
-    Write-Host "$GRAY━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━$RESET"
-    exit 3
-}
-
-if ($ProjectName -match '[\.\s]$') {
-    Write-Host "$GRAY━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━$RESET"
-    Write-ErrorMsg "❌ Nome inválido: '$ProjectName'"
-    Write-Warn "No Windows, nomes de pasta não podem terminar com '.' ou espaço."
-    Write-Host "$GRAY━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━$RESET"
-    exit 4
-}
-
-$baseName = ($ProjectName.Split('.')[0]).ToUpperInvariant()
-$reserved = @("CON","PRN","AUX","NUL","COM1","COM2","COM3","COM4","COM5","COM6","COM7","COM8","COM9","LPT1","LPT2","LPT3","LPT4","LPT5","LPT6","LPT7","LPT8","LPT9")
-if ($reserved -contains $baseName) {
-    Write-Host "$GRAY━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━$RESET"
-    Write-ErrorMsg "❌ Nome inválido: '$ProjectName'"
-    Write-Warn "Esse é um nome reservado do Windows."
-    Write-Info "Escolha outro (ex: '${ProjectName}_proj')."
-    Write-Host "$GRAY━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━$RESET"
-    exit 5
-}
-
-if (Test-Path -LiteralPath $ProjectName -PathType Container) {
-    Write-Host "$GRAY━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━$RESET"
-    Write-ErrorMsg "❌ Já existe uma pasta com o nome: '$ProjectName'"
-    Write-Info "Sugestões:"
-    Write-Info "  • Use outro nome: ./criar_projeto_cpp.ps1 ${ProjectName}_2"
-    Write-Info "  • Ou renomeie/apague a pasta existente."
-    Write-Host "$GRAY━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━$RESET"
-    exit 6
-}
-
 
 #============================ [ CRIAÇÃO DO PROJETO ] ============================
 try {
@@ -128,28 +198,28 @@ try {
 # src/main.cpp
     @"
 /******************************************************************************
-COMPONENTE:   <NOME_DO_ARQUIVO>.cpp
-AUTOR:      <SEU_NOME>
-DATA:        <DD/MM/AAAA>
-PROPOSITO:     <Função do componente dentro do sistema>
+COMPONENTE:   main.cpp
+AUTOR:        <SEU_NOME>
+DATA:         <DD/MM/AAAA>
+PROPOSITO:    Ponto de entrada do executavel gerado pelo bootstrap.
 
 RESPONSABILIDADES:
-- <Responsabilidade 1>
-- <Responsabilidade 2>
-- <Responsabilidade n>
+- Inicializar a localizacao do terminal.
+- Manter a janela aberta para facilitar a execucao em modo interativo.
 
 NOTAS:
-- <Observações adicionais>
+- Substitua os campos de autoria ao transformar este template em um projeto real.
 *******************************************************************************/
 
-#include <iostream>
 #include <clocale>
+#include <iostream>
 
-int main(){
+int main() {
     setlocale(LC_ALL, "pt-BR.UTF-8");
 
-    
+    std::cout << "Pressione ENTER para encerrar..." << std::endl;
     std::cin.get();
+    return 0;
 }
 "@ | Out-File src/main.cpp -Encoding utf8
 
@@ -267,6 +337,16 @@ if (WIN32)
         DEPENDS ${PROJECT_NAME}
         VERBATIM
     )
+elseif (APPLE)
+    add_custom_target(run
+        COMMAND open -a Terminal "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}"
+        DEPENDS ${PROJECT_NAME}
+    )
+else()
+    add_custom_target(run
+        COMMAND ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}
+        DEPENDS ${PROJECT_NAME}
+    )
 endif()
 '@ 
 $cmake = $cmake -replace '__PROJECT_NAME__', $ProjectName
@@ -274,7 +354,32 @@ $cmake | Out-File CMakeLists.txt -Encoding utf8
 
 # .gitignore
     @"
+# Build e artefatos de compilacao
 build/
+cmake-build-*/
+out/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+compile_commands.json
+Makefile
+
+# Binarios e bibliotecas geradas
+*.exe
+*.out
+*.dll
+*.so
+*.dylib
+*.a
+*.lib
+*.o
+*.obj
+*.pdb
+*.ilk
+
+# IDEs e caches locais
+.vscode/
+.idea/
 "@ | Out-File .gitignore -Encoding utf8
 
 }
@@ -294,8 +399,21 @@ Write-Host "$GRAY━━━━━━━━━━━━━━━━━━━━━
 Write-Host "✅ Projeto $GREEN'$ProjectName'$RESET criado com sucesso!"
 Write-Host ""
 Write-Host "$CYAN📌 Próximo passo:$RESET"
-Write-Host "   $BLUE•$RESET Abra o projeto no VS Code com:"
-Write-Host "     $BLUE code .$RESET"
+Write-Host "1 - Abra o projeto no VS Code com $BLUE code .$RESET"
+Write-Host "2 - Compile com $BLUE cmake --build .$RESET"
+Write-Host ""
+
+Write-Host "$CYAN🖥️ Sistema:$RESET"
+if ($IsWindows) { 
+    Write-Host "   Windows"; 
+}
+elseif ($IsMacOS) { 
+    Write-Host "   macOS"; 
+}
+else { 
+    Write-Host "   Linux"; 
+}
+
 Write-Host "$GRAY━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━$RESET"
 Write-Host ""
 
