@@ -167,15 +167,24 @@ try {
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Rodar no Terminal Externo",
-            "type": "cppvsdbg",
+            "name": "Debug com g++ (MSYS2)",
+            "type": "cppdbg",
             "request": "launch",
             "program": "${command:cmake.launchTargetPath}",
             "args": [],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [],
-            "console": "externalTerminal"
+            "externalConsole": true, 
+            "MIMode": "gdb",
+            "miDebuggerPath": "C:/msys64/ucrt64/bin/gdb.exe",
+            "setupCommands": [
+                {
+                    "description": "Habilitar impressão bonita para gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ]
         }
     ]
 }
@@ -185,77 +194,65 @@ try {
     @'
 {
     "cmake.exportCompileCommandsFile": true,
-
+    "C_Cpp.intelliSenseEngine": "disabled",
     "clangd.arguments": [
         "--compile-commands-dir=${workspaceFolder}/build",
         "--query-driver=C:/msys64/ucrt64/bin/g++.exe"
-    ],
-
-    "C_Cpp.intelliSenseEngine": "disabled"
+    ]
 }
 '@ | Out-File ".vscode/settings.json" -Encoding utf8
 
 # src/main.cpp
     @"
 /******************************************************************************
-COMPONENTE:   main.cpp
 AUTOR:        <SEU_NOME>
 DATA:         <DD/MM/AAAA>
-PROPOSITO:    Ponto de entrada do executavel gerado pelo bootstrap.
-
-RESPONSABILIDADES:
-- Inicializar a localizacao do terminal.
-- Manter a janela aberta para facilitar a execucao em modo interativo.
-
 NOTAS:
-- Substitua os campos de autoria ao transformar este template em um projeto real.
+
 *******************************************************************************/
 
-#include <clocale>
 #include <iostream>
+#include <clocale>
 
 int main() {
-    setlocale(LC_ALL, "pt-BR.UTF-8");
+    std::setlocale(LC_ALL, "pt-BR.UTF-8");
 
-    std::cout << "Pressione ENTER para encerrar..." << std::endl;
-    std::cin.get();
-    return 0;
+    
+    std::cin.ignore();
 }
 "@ | Out-File src/main.cpp -Encoding utf8
 
 # CMakeLists.txt
 $cmake = @'
 #═══════════════════════════════════════════════════════════════════════════════
-# 🧱 CONFIGURAÇÃO MÍNIMA DO CMAKE
+# 1 - CONFIGURAÇÃO MÍNIMA DO CMAKE
 # ------------------------------------------------------------------------------
 # Define a versão mínima do CMake necessária para gerar o projeto.
 # Garante compatibilidade com comandos e recursos usados neste arquivo.
 cmake_minimum_required(VERSION 3.20)
 
 #═══════════════════════════════════════════════════════════════════════════════
-# 📦 DEFINIÇÃO DO PROJETO
+# 2 - DEFINIÇÃO DO PROJETO
 # ------------------------------------------------------------------------------
 # Nome do projeto e linguagem utilizada.
 # O nome do executável final será o mesmo do projeto.
 project(__PROJECT_NAME__ LANGUAGES CXX)
 
 #═══════════════════════════════════════════════════════════════════════════════
-# 🔢 CONFIGURAÇÕES DA LINGUAGEM C++
+# 3 - CONFIGURAÇÕES DA LINGUAGEM C++
 # ------------------------------------------------------------------------------
 # Define o padrão da linguagem C++ utilizado no projeto.
-# Aqui usamos C++23.
 set(CMAKE_CXX_STANDARD 23)
 
 # Obriga o compilador a respeitar exatamente o padrão definido acima.
-# Se o compilador não suportar C++23, a configuração falha.
+# Se o compilador não suportar o padrão definido, a configuração falha.
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 #═══════════════════════════════════════════════════════════════════════════════
-# 🐞 TIPO DE BUILD
+# 4 - TIPO DE BUILD
 # ------------------------------------------------------------------------------
 # Define o tipo de build padrão.
 # "Debug" habilita símbolos de depuração e desativa otimizações.
-# Obs: funciona bem com Ninja/Make (geradores single-config).
 set(CMAKE_BUILD_TYPE Debug)
 
 file(GLOB_RECURSE PROJECT_SOURCES CONFIGURE_DEPENDS
@@ -263,29 +260,29 @@ file(GLOB_RECURSE PROJECT_SOURCES CONFIGURE_DEPENDS
 )
 
 #═══════════════════════════════════════════════════════════════════════════════
-# 🚀 CRIAÇÃO DO EXECUTÁVEL
+# 5 - CRIAÇÃO DO EXECUTÁVEL
 # ------------------------------------------------------------------------------
 # Cria o target do executável usando o nome do projeto (PROJECT_NAME).
 add_executable(${PROJECT_NAME})
 
 #═══════════════════════════════════════════════════════════════════════════════
-# 📄 ARQUIVOS FONTE (.cpp)
+# 6 - ARQUIVOS-FONTE (.cpp)
 # ------------------------------------------------------------------------------
 # Associa os arquivos de implementação (.cpp) ao executável.
 # O uso de target_sources melhora a organização e facilita a manutenção.
 target_sources(${PROJECT_NAME} PRIVATE ${PROJECT_SOURCES})
 
 #═══════════════════════════════════════════════════════════════════════════════
-# 📁 DIRETÓRIOS DE HEADERS (.hpp)
+# 7 - HEADERS (.hpp)
 # ------------------------------------------------------------------------------
 # Informa ao compilador onde procurar arquivos de cabeçalho (.hpp).
 # Boa prática: headers ficam separados na pasta "include/".
 target_include_directories(${PROJECT_NAME} PRIVATE include)
 
 #═══════════════════════════════════════════════════════════════════════════════
-# 🚨 FLAGS DE COMPILAÇÃO (QUALIDADE DE CÓDIGO)
+# 8 - FLAGS DE COMPILAÇÃO (QUALIDADE DE CÓDIGO)
 # ------------------------------------------------------------------------------
-# Conjunto de warnings agressivos para forçar boas práticas em C++.
+# Conjunto de warnings (agressivos) para forçar boas práticas em C++.
 # Ideal para aprendizado e para evitar comportamentos indefinidos.
 
 if (MSVC)
@@ -303,51 +300,11 @@ else()
         -Wextra                     # Avisos adicionais (mais rigor)
         -Wconversion                # Alerta sobre conversões implícitas perigosas
         -Wsign-conversion           # Alerta sobre conversões signed/unsigned
-        -pedantic-errors            # Segue o padrão C++ à risca (modo hardcore 😈)
-        -fdiagnostics-color=always  # Mensagens de erro coloridas no terminal 🌈
+        -pedantic-errors            # Segue o padrão C++ à risca (!!! HARDCORE !!!)
+        -fdiagnostics-color=always  # Mensagens de erro coloridas no terminal
     )
 endif()
 
-#═══════════════════════════════════════════════════════════════════════════════
-# ▶️ TARGET "run" (WINDOWS) com fallback
-# ------------------------------------------------------------------------------
-# Target auxiliar para executar o programa após a compilação.
-#
-# Comportamento:
-# - Abre um CMD externo (fora do VS Code)
-# - Executa o binário gerado (independente do nome/pasta/configuração)
-# - Mantém a janela aberta após a execução (/k)
-#
-# Execução:
-# cmake --build . --target run
-#
-# Implementação:
-# - Usa o PowerShell para iniciar um novo processo (Start-Process)
-# - O CMD é aberto com o parâmetro /k para não fechar automaticamente
-#
-if (WIN32)
-    add_custom_target(run
-        COMMAND powershell -NoProfile -ExecutionPolicy Bypass -Command
-        " $exe = Join-Path '${CMAKE_CURRENT_BINARY_DIR}' '${PROJECT_NAME}.exe'; \
-          if (Get-Command wt.exe -ErrorAction SilentlyContinue) { \
-              wt.exe nt -d '${CMAKE_CURRENT_BINARY_DIR}' cmd.exe /k \"\"$exe\"\"; \
-          } else { \
-              cmd.exe /k \"\"$exe\"\"; \
-          } "
-        DEPENDS ${PROJECT_NAME}
-        VERBATIM
-    )
-elseif (APPLE)
-    add_custom_target(run
-        COMMAND open -a Terminal "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}"
-        DEPENDS ${PROJECT_NAME}
-    )
-else()
-    add_custom_target(run
-        COMMAND ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}
-        DEPENDS ${PROJECT_NAME}
-    )
-endif()
 '@ 
 $cmake = $cmake -replace '__PROJECT_NAME__', $ProjectName
 $cmake | Out-File CMakeLists.txt -Encoding utf8
