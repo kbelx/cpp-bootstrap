@@ -13,7 +13,7 @@ Nome do projeto a ser criado.
 ./cpp_bootstrap.ps1 MeuProjeto
 
 .EXAMPLE
-cpp-bootstrap MeuProjeto
+pwsh ./cpp_bootstrap.ps1 MeuProjeto
 #>
 
 param (
@@ -68,8 +68,8 @@ function validar_NomeProjeto {
     # 1 - Encerra o programa caso NOME ESTEJA VAZIO.
     if ([string]::IsNullOrWhiteSpace($ProjectName)) {
         Write-ErrorMsg "❌ Nome do projeto vazio.";
-        Write-Info "✅ Exemplo local: ./cpp_bootstrap.ps1 MeuProjeto";
-        Write-Info "✅ Exemplo global: cpp-bootstrap MeuProjeto";
+        Write-Info "✅ Exemplo (Windows): ./cpp_bootstrap.ps1 MeuProjeto";
+        Write-Info "✅ Exemplo (Linux/macOS): pwsh ./cpp_bootstrap.ps1 MeuProjeto";
 
         return $false
     } 
@@ -137,7 +137,7 @@ function validar_NomeProjeto {
         Write-Host $line;
         Write-ErrorMsg "❌ Já existe uma pasta com o nome: '$ProjectName'";
         Write-Info "Sugestões:";
-        Write-Info "  • Use outro nome: cpp-bootstrap ${ProjectName}_2";
+        Write-Info "  • Use outro nome: ./cpp_bootstrap.ps1 ${ProjectName}_2";
         Write-Info "  • Ou renomeie/apague a pasta existente.";
         Write-Host $line;
 
@@ -266,7 +266,6 @@ file(GLOB_RECURSE PROJECT_SOURCES CONFIGURE_DEPENDS
 add_executable(${PROJECT_NAME})
 
 #═══════════════════════════════════════════════════════════════════════════════
-# 6 - ARQUIVOS-FONTE (.cpp)
 # ------------------------------------------------------------------------------
 # Associa os arquivos de implementação (.cpp) ao executável.
 # O uso de target_sources melhora a organização e facilita a manutenção.

@@ -1,24 +1,25 @@
 # Agent Guide — Project Bootstrap
 
 ## 1. Contexto
-Este projeto é um gerador de estrutura de diretório ( pasta-pai + subpastas )
+Este projeto é um gerador de estrutura de diretórios e arquivos de configuração para projetos C++23 com CMake (`cpp_bootstrap.ps1`).
 
 O agente deve ajudar a:
-- Manter consistência estrutural ( principalmente do CMakeLists.txt )
-- Automatizar tarefas repetitivas
+- Manter consistência estrutural e integridade dos templates gerados.
+- Garantir que a documentação única no `README.md` reflita exatamente o que o script produz.
+- Automatizar tarefas mantendo compatibilidade cross-platform (PowerShell Core / Windows PowerShell).
 
 ---
 
-## 2. Objetivo do agente
+## 2. Objetivo do Agente
 - Gerar e manter estruturas de projeto de forma padronizada e eficiente.
-- documentar o código quando possivel
--
+- Documentar o código no próprio script e manter a documentação consolidada no `README.md`.
+- Garantir que `cpp_bootstrap.ps1` seja a única fonte de verdade para os templates embutidos.
 
 ---
 
-## 3.1 Estrutura de Diretórios padrão
+## 3. Estrutura Padrão Gerada
 
-```
+```text
 MeuProjeto/
     ├── src/
     │   └── main.cpp
@@ -32,153 +33,37 @@ MeuProjeto/
     └── .gitignore
 ```
 
-## 3.2 Estrutura do CmakeLists.txt
-
-```txt
-#═══════════════════════════════════════════════════════════════════════════════
-# 🧱 CONFIGURAÇÃO MÍNIMA DO CMAKE
-# ------------------------------------------------------------------------------
-# Define a versão mínima do CMake necessária para gerar o projeto.
-# Garante compatibilidade com comandos e recursos usados neste arquivo.
-cmake_minimum_required(VERSION 3.20)
-
-#═══════════════════════════════════════════════════════════════════════════════
-# 📦 DEFINIÇÃO DO PROJETO
-# ------------------------------------------------------------------------------
-# Nome do projeto e linguagem utilizada.
-# O nome do executável final será o mesmo do projeto.
-project(__PROJECT_NAME__ LANGUAGES CXX)
-
-#═══════════════════════════════════════════════════════════════════════════════
-# 🔢 CONFIGURAÇÕES DA LINGUAGEM C++
-# ------------------------------------------------------------------------------
-# Define o padrão da linguagem C++ utilizado no projeto.
-# Aqui usamos C++23.
-set(CMAKE_CXX_STANDARD 23)
-
-# Obriga o compilador a respeitar exatamente o padrão definido acima.
-# Se o compilador não suportar C++23, a configuração falha.
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-
-#═══════════════════════════════════════════════════════════════════════════════
-# 🐞 TIPO DE BUILD
-# ------------------------------------------------------------------------------
-# Define o tipo de build padrão.
-# "Debug" habilita símbolos de depuração e desativa otimizações.
-# Obs: funciona bem com Ninja/Make (geradores single-config).
-set(CMAKE_BUILD_TYPE Debug)
-
-file(GLOB_RECURSE PROJECT_SOURCES CONFIGURE_DEPENDS
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp"
-)
-
-#═══════════════════════════════════════════════════════════════════════════════
-# 🚀 CRIAÇÃO DO EXECUTÁVEL
-# ------------------------------------------------------------------------------
-# Cria o target do executável usando o nome do projeto (PROJECT_NAME).
-add_executable(${PROJECT_NAME})
-
-#═══════════════════════════════════════════════════════════════════════════════
-# 📄 ARQUIVOS FONTE (.cpp)
-# ------------------------------------------------------------------------------
-# Associa os arquivos de implementação (.cpp) ao executável.
-# O uso de target_sources melhora a organização e facilita a manutenção.
-target_sources(${PROJECT_NAME} PRIVATE ${PROJECT_SOURCES})
-
-#═══════════════════════════════════════════════════════════════════════════════
-# 📁 DIRETÓRIOS DE HEADERS (.hpp)
-# ------------------------------------------------------------------------------
-# Informa ao compilador onde procurar arquivos de cabeçalho (.hpp).
-# Boa prática: headers ficam separados na pasta "include/".
-target_include_directories(${PROJECT_NAME} PRIVATE include)
-
-#═══════════════════════════════════════════════════════════════════════════════
-# 🚨 FLAGS DE COMPILAÇÃO (QUALIDADE DE CÓDIGO)
-# ------------------------------------------------------------------------------
-# Conjunto de warnings agressivos para forçar boas práticas em C++.
-# Ideal para aprendizado e para evitar comportamentos indefinidos.
-
-if (MSVC)
-    # Visual Studio / MSVC
-    target_compile_options(${PROJECT_NAME} PRIVATE
-        /W4            # warnings altos
-        /permissive-   # modo mais "padrão"
-        /EHsc          # exceções C++ padrão
-    )
-
-else()
-    # GCC / Clang (MSYS2 g++, clang, Linux, etc.)
-    target_compile_options(${PROJECT_NAME} PRIVATE 
-        -Wall                       # Avisos básicos do compilador
-        -Wextra                     # Avisos adicionais (mais rigor)
-        -Wconversion                # Alerta sobre conversões implícitas perigosas
-        -Wsign-conversion           # Alerta sobre conversões signed/unsigned
-        -pedantic-errors            # Segue o padrão C++ à risca (modo hardcore 😈)
-        -fdiagnostics-color=always  # Mensagens de erro coloridas no terminal 🌈
-    )
-endif()
-
-#═══════════════════════════════════════════════════════════════════════════════
-# ▶️ TARGET "run" (WINDOWS) com fallback
-# ------------------------------------------------------------------------------
-# Target auxiliar para executar o programa após a compilação.
-#
-# Comportamento:
-# - Abre um CMD externo (fora do VS Code)
-# - Executa o binário gerado (independente do nome/pasta/configuração)
-# - Mantém a janela aberta após a execução (/k)
-#
-# Execução:
-# cmake --build . --target run
-#
-# Implementação:
-# - Usa o PowerShell para iniciar um novo processo (Start-Process)
-# - O CMD é aberto com o parâmetro /k para não fechar automaticamente
-#
-if (WIN32)
-    add_custom_target(run
-        COMMAND powershell -NoProfile -ExecutionPolicy Bypass -Command
-        " $exe = Join-Path '${CMAKE_CURRENT_BINARY_DIR}' '${PROJECT_NAME}.exe'; \
-          if (Get-Command wt.exe -ErrorAction SilentlyContinue) { \
-              wt.exe nt -d '${CMAKE_CURRENT_BINARY_DIR}' cmd.exe /k \"\"$exe\"\"; \
-          } else { \
-              cmd.exe /k \"\"$exe\"\"; \
-          } "
-        DEPENDS ${PROJECT_NAME}
-        VERBATIM
-    )
-elseif (APPLE)
-    add_custom_target(run
-        COMMAND open -a Terminal "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}"
-        DEPENDS ${PROJECT_NAME}
-    )
-else()
-    add_custom_target(run
-        COMMAND ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}
-        DEPENDS ${PROJECT_NAME}
-    )
-endif()
-```
+### Configuração do CMakeLists.txt Gerado
+O script gera um arquivo `CMakeLists.txt` configurado com:
+- `cmake_minimum_required(VERSION 3.20)`
+- `set(CMAKE_CXX_STANDARD 23)` e `set(CMAKE_CXX_STANDARD_REQUIRED ON)`
+- `set(CMAKE_BUILD_TYPE Debug)`
+- Coleta de fontes via `file(GLOB_RECURSE PROJECT_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp")`
+- Diretório de cabeçalhos privado apontando para `include`
+- Flags rigorosas de compilação:
+  - MSVC: `/W4 /permissive- /EHsc`
+  - GCC / Clang: `-Wall -Wextra -Wconversion -Wsign-conversion -pedantic-errors -fdiagnostics-color=always`
 
 ---
 
-## 4. Comportamento esperado
+## 4. Comportamento Esperado
 
-- Sempre criar diretórios antes de criar arquivos
-- Nunca sobrescrever arquivos sem confirmação
-- Usar nomes em snake_case
-- Manter código limpo e interativo, evitando 
+- Sempre criar diretórios antes de criar arquivos.
+- Nunca sobrescrever arquivos sem confirmação do usuário.
+- Usar nomes em `snake_case` para scripts e arquivos auxiliares.
+- Manter código limpo, comentado e interativo, evitando comandos desnecessários ou código morto.
+- Manter a codificação estritamente em UTF-8 sem BOM.
 
 ---
 
-## 5. Comandos disponíveis
+## 5. Comandos Disponíveis
 
-### Criar projeto ( caso o SISTEMA OPERACIONAL seja WINDOWS )
-```bash
+### Criar projeto (Windows)
+```powershell
 ./cpp_bootstrap.ps1 NomeDoProjeto
 ```
 
-### Criar projeto ( caso o SISTEMA OPERACIONAL seja Linux ou macOS )
-```bash
+### Criar projeto (Linux ou macOS)
+```powershell
 pwsh ./cpp_bootstrap.ps1 NomeDoProjeto
 ```
