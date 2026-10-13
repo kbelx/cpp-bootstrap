@@ -115,3 +115,35 @@ cmake --build build
 # 3. Executar o binário gerado (Windows)
 ./build/MeuProjeto.exe
 ```
+
+---
+
+## 6. Ambiente de Testes Automatizados
+
+O repositório inclui uma suíte completa de testes automatizados localizada em [`tests/test_cpp_bootstrap.ps1`](tests/test_cpp_bootstrap.ps1), projetada para validar a integridade sintática, as regras de segurança/validação de nomes, a correta geração de todos os arquivos e modelos, além de permitir o teste de compilação real de ponta a ponta.
+
+### Características do Ambiente de Testes
+- **Isolamento Total (Sandbox):** Cada execução cria uma pasta temporária exclusiva (`$env:TEMP`) e roda o bootstrap em subprocesso isolado, garantindo que nenhum arquivo de teste polua o repositório ou modifique o diretório de trabalho do usuário.
+- **Teardown Automático:** Todo diretório e artefato de teste gerado é removido automaticamente ao término, mesmo se algum teste falhar.
+- **Compatibilidade Multiplataforma:** Compatível com PowerShell 7+ (`pwsh`) e Windows PowerShell 5.1 (com delegação transparente para o ambiente disponível).
+
+### Como Executar os Testes
+
+#### 1. Execução Padrão (Sintaxe, Validações e Estrutura)
+```powershell
+./tests/test_cpp_bootstrap.ps1
+```
+*(ou `pwsh ./tests/test_cpp_bootstrap.ps1` no Linux/macOS)*
+
+#### 2. Execução Completa com Compilação Real C++23 (CMake + g++)
+Testa a geração e compila o código do projeto gerado para validar que o `CMakeLists.txt` e o `src/main.cpp` compilam sem warnings/erros:
+```powershell
+./tests/test_cpp_bootstrap.ps1 -IncludeBuild
+```
+
+#### 3. Modo Detalhado (Verbose)
+Exibe a saída bruta (`stdout`/`stderr`) de cada comando e processo invocado internamente:
+```powershell
+./tests/test_cpp_bootstrap.ps1 -VerboseOutput
+```
+

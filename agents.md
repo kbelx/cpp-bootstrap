@@ -14,6 +14,7 @@ O agente deve ajudar a:
 - Gerar e manter estruturas de projeto de forma padronizada e eficiente.
 - Documentar o código no próprio script e manter a documentação consolidada no `README.md`.
 - Garantir que `cpp_bootstrap.ps1` seja a única fonte de verdade para os templates embutidos.
+- Garantir o commit e o push apropriado para cada tarefa.
 
 ---
 
