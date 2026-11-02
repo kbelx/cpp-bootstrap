@@ -143,6 +143,7 @@ function Invoke-ExternalProcess {
     $startInfo = New-Object System.Diagnostics.ProcessStartInfo
     $startInfo.FileName               = $FilePath
     $startInfo.WorkingDirectory       = $WorkingDirectory
+    $startInfo.RedirectStandardInput  = $true
     $startInfo.RedirectStandardOutput = $true
     $startInfo.RedirectStandardError  = $true
     $startInfo.UseShellExecute        = $false
@@ -165,6 +166,7 @@ function Invoke-ExternalProcess {
     $process.StartInfo = $startInfo
 
     [void]$process.Start()
+    $process.StandardInput.Close()
     $stdoutTask = $process.StandardOutput.ReadToEndAsync()
     $stderrTask = $process.StandardError.ReadToEndAsync()
     $process.WaitForExit()
@@ -491,6 +493,11 @@ try {
         if ($cmakeContent -notmatch "-pedantic-errors" -or $cmakeContent -notmatch "/permissive-") {
             throw "Flags rigorosas de compilacao (GCC/Clang e MSVC) ausentes"
         }
+        if ($cmakeContent -notmatch "include\(CheckLinkerFlag\)" -or
+            $cmakeContent -notmatch 'check_linker_flag\(CXX\s+"-lstdc\+\+exp"\s+HAVE_STDCXXEXP\)' -or
+            $cmakeContent -notmatch 'target_link_libraries\(\$\{PROJECT_NAME\}\s+PRIVATE\s+stdc\+\+exp\)') {
+            throw "Secao 9 de suporte a libstdc++exp (CheckLinkerFlag / stdc++exp) ausente no CMakeLists.txt"
+        }
         return $true
     }
 
@@ -568,6 +575,7 @@ try {
     if ($IncludeBuild) {
         if (-not $hasCmake -or -not $hasCompiler) {
             Invoke-Skip "Compilacao real com CMake e C++23" "CMake ou compilador C++ (g++, clang++, cl) ausente no PATH"
+            Invoke-Skip "Linkagem e execucao C++23 (<print> / <stacktrace>) via stdc++exp" "CMake ou compilador C++ ausente no PATH"
         }
         else {
             Invoke-Test "Projeto gerado configura (respeitando CMAKE_BUILD_TYPE) e compila em C++23" {
@@ -623,10 +631,69 @@ try {
 
                 return $true
             }
+
+            Invoke-Test "Linkagem e execucao C++23 (<print> / <stacktrace>) funcionam sem erro de linker (stdc++exp)" {
+                $buildDir = Join-Path -Path $projectDir -ChildPath "build"
+                $mainCpp  = Join-Path -Path $projectDir -ChildPath "src/main.cpp"
+
+                $cpp23Source = @'
+#include <iostream>
+#if __has_include(<print>)
+#include <print>
+#endif
+#if __has_include(<stacktrace>)
+#include <stacktrace>
+#endif
+
+int main() {
+#if defined(__cpp_lib_print)
+    std::println("C++23 std::println ativo");
+#else
+    std::cout << "C++23 padrao ativo\n";
+#endif
+#if defined(__cpp_lib_stacktrace)
+    auto st = std::stacktrace::current();
+    if (st.empty()) {
+        return 1;
+    }
+#endif
+    return 0;
+}
+'@
+                $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+                [System.IO.File]::WriteAllText($mainCpp, ($cpp23Source -replace "`r`n", "`n"), $utf8NoBom)
+
+                $rebuildRes = Invoke-ExternalProcess -FilePath "cmake" -ArgumentList @("--build", "build", "--clean-first", "--config", "Release") -WorkingDirectory $projectDir
+                if ($rebuildRes.ExitCode -ne 0) {
+                    throw "Falha ao linkar recursos C++23 (<print>/<stacktrace>): $($rebuildRes.StdErr)"
+                }
+
+                $binName = if ($isWin) { "$validProject.exe" } else { $validProject }
+                $candidates = @(
+                    (Join-Path -Path $buildDir -ChildPath $binName),
+                    (Join-Path -Path $buildDir -ChildPath "Release/$binName"),
+                    (Join-Path -Path $buildDir -ChildPath "Debug/$binName")
+                )
+                $exePath = @($candidates | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf })[0]
+                if (-not $exePath) {
+                    throw "Executavel C++23 nao encontrado apos rebuild"
+                }
+
+                $runRes = Invoke-ExternalProcess -FilePath $exePath -ArgumentList @() -WorkingDirectory $projectDir
+                if ($runRes.ExitCode -ne 0) {
+                    throw "Execucao do binario C++23 falhou com exit code $($runRes.ExitCode)"
+                }
+                if ($runRes.StdOut -notmatch "C\+\+23") {
+                    throw "Saida esperada 'C++23...' nao encontrada: $($runRes.StdOut)"
+                }
+
+                return $true
+            }
         }
     }
     else {
         Invoke-Skip "Compilacao real com CMake e C++23" "Passe -IncludeBuild para executar este teste"
+        Invoke-Skip "Linkagem e execucao C++23 (<print> / <stacktrace>) via stdc++exp" "Passe -IncludeBuild para executar este teste"
     }
 }
 finally {

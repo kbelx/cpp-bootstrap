@@ -44,6 +44,7 @@ O script gera um arquivo `CMakeLists.txt` configurado com:
 - Flags rigorosas de compilação:
   - MSVC: `/W4 /permissive- /EHsc`
   - GCC / Clang: `-Wall -Wextra -Wconversion -Wsign-conversion -pedantic-errors -fdiagnostics-color=always`
+- Vinculação condicional automática de `stdc++exp` via `CheckLinkerFlag` (`check_linker_flag(CXX "-lstdc++exp" HAVE_STDCXXEXP)`) fora de MSVC/Apple para suportar recursos C++23 da `libstdc++` (como `<print>` e `<stacktrace>`) tanto no GCC quanto no Clang
 
 ---
 

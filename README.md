@@ -100,7 +100,7 @@ MeuProjeto/
 | `include/` | Diretório dedicado para arquivos de cabeçalho (`.hpp` / `.h`). |
 | `.vscode/launch.json` | Configuração de depuração multiplataforma (`cppdbg`) com blocos dedicados para `windows` (MSYS2 GDB), `linux` (`/usr/bin/gdb`) e `osx` (`lldb`). |
 | `.vscode/settings.json` | Habilita `compile_commands.json` e configura o `--query-driver` do `clangd` para compiladores no Windows (MSYS2), Linux e macOS. |
-| `CMakeLists.txt` | Configuração CMake com C++23 estrito, `CMAKE_BUILD_TYPE` padrão `Debug` não-destrutivo (respeita `-DCMAKE_BUILD_TYPE=Release` e geradores multi-config), inclusão de `include/`, coleta em `src/*.cpp` e flags rigorosas (`/W4 /permissive- /EHsc` no MSVC; `-Wall -Wextra -Wconversion -Wsign-conversion -pedantic-errors` no GCC/Clang). |
+| `CMakeLists.txt` | Configuração CMake com C++23 estrito, `CMAKE_BUILD_TYPE` padrão `Debug` não-destrutivo (respeita `-DCMAKE_BUILD_TYPE=Release` e geradores multi-config), inclusão de `include/`, coleta em `src/*.cpp`, flags rigorosas (`/W4 /permissive- /EHsc` no MSVC; `-Wall -Wextra -Wconversion -Wsign-conversion -pedantic-errors` no GCC/Clang) e linkagem automática de `stdc++exp` via `CheckLinkerFlag` para recursos C++23 da `libstdc++` (`<print>`, `<stacktrace>`). |
 | `.gitignore` | Ignora pastas de build (`build/`, `out/`), binários e caches locais do `.vscode/*`, preservando `!.vscode/launch.json` e `!.vscode/settings.json` no controle de versão. |
 
 ---
@@ -151,7 +151,7 @@ O repositório inclui uma suíte completa de testes automatizados em [`tests/tes
 
 ---
 
-### 6.2. Matriz dos 19 Cenários de Teste
+### 6.2. Matriz dos 20 Cenários de Teste
 
 | Nº | Categoria | Descrição do Teste | Critério de Sucesso |
 | :--- | :--- | :--- | :--- |
@@ -169,11 +169,12 @@ O repositório inclui uma suíte completa de testes automatizados em [`tests/tes
 | **12** | **Estrutura** | Verificação das pastas obrigatórias | Pastas raiz, `src/`, `include/` e `.vscode/` presentes |
 | **13** | **Artefatos** | Integridade de `src/main.cpp` | Presença de `int main()`, `<iostream>`, `<clocale>` e `std::setlocale(LC_ALL, "")` |
 | **14** | **Artefatos** | Configurações multiplataforma do VS Code (`launch.json` e `settings.json`) | JSON válido com blocos `windows`/`linux`/`osx` e `--query-driver` multi-SO |
-| **15** | **Artefatos** | Configuração do `CMakeLists.txt` | Template substituído, `C++23` estrito, guarda de `CMAKE_BUILD_TYPE` e flags rigorosas |
+| **15** | **Artefatos** | Configuração do `CMakeLists.txt` | Template substituído, `C++23` estrito, guarda de `CMAKE_BUILD_TYPE`, flags rigorosas e Seção 9 (`stdc++exp`) |
 | **16** | **Artefatos** | Regras do `.gitignore` gerado | Ignora `build/`, binários e `.vscode/*`, preservando `!.vscode/launch.json` e `!.vscode/settings.json` |
 | **17** | **Encoding** | Auditoria binária dos 5 arquivos gerados | Todos estritamente em UTF-8 sem BOM e fim de linha LF |
 | **18** | **Compatibilidade** | Execução direta no Windows PowerShell 5.1 (`powershell.exe`) | Exit code `0`, sem vazamento ANSI `e[` e sem gravação de BOM (`SKIP` fora do Windows) |
 | **19** | **Integração** | Compilação C++23 real com CMake (`-DCMAKE_BUILD_TYPE=Release`) | Executável compilado com sucesso e `CMAKE_BUILD_TYPE` respeitado |
+| **20** | **Integração** | Linkagem e execução real C++23 (`<print>` / `<stacktrace>`) via `stdc++exp` | Binário C++23 com `std::println`/`std::stacktrace` linka e executa com exit code `0` |
 
 ---
 

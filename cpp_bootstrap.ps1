@@ -381,6 +381,19 @@ else()
         -fdiagnostics-color=always  # Mensagens coloridas no terminal
     )
 endif()
+
+#===============================================================================
+# 9 - SUPORTE COMPLETO A BIBLIOTECA PADRAO C++23 (libstdc++exp)
+# ------------------------------------------------------------------------------
+# Em toolchains baseadas na libstdc++ (GCC e Clang no MSYS2/Linux), recursos
+# recentes do C++23 como <print> e <stacktrace> residem em libstdc++exp.a.
+if(NOT MSVC AND NOT APPLE)
+    include(CheckLinkerFlag)
+    check_linker_flag(CXX "-lstdc++exp" HAVE_STDCXXEXP)
+    if(HAVE_STDCXXEXP)
+        target_link_libraries(${PROJECT_NAME} PRIVATE stdc++exp)
+    endif()
+endif()
 '@
     $cmakeContent = $cmakeTemplate.Replace("__PROJECT_NAME__", $ProjectName)
     Write-Utf8NoBom -Path (Join-Path -Path $projectRoot -ChildPath "CMakeLists.txt") -Content $cmakeContent
