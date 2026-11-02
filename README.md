@@ -10,7 +10,7 @@ tags:
 
 # C++ Bootstrap
 
-Utilitário em PowerShell para inicialização rápida de projetos em **C++23** com **CMake**, estrutura de diretórios padronizada e ambiente pronto para desenvolvimento e depuração no **Visual Studio Code**.
+Utilitário multiplataforma em PowerShell para inicialização rápida de projetos em **C++23** com **CMake**, estrutura de diretórios padronizada e ambiente pronto para desenvolvimento e depuração no **Visual Studio Code** (Windows, Linux e macOS).
 
 ---
 
@@ -18,10 +18,13 @@ Utilitário em PowerShell para inicialização rápida de projetos em **C++23** 
 
 - **Título:** C++ Bootstrap
 - **Descrição:** Gerador automatizado de estrutura e arquivos de configuração para novos projetos C++.
-- **Autoria:** Bruno Costa ([@kbelx_](https://github.com/kbelx_))
+- **Autoria:** Bruno Costa ([@kbelx](https://github.com/kbelx))
 - **Padrão C++:** C++23 estrito (`set(CMAKE_CXX_STANDARD_REQUIRED ON)`)
 - **Build System:** CMake (mínimo 3.20)
-- **Compilador / Debugger:** GCC (`g++`) e GDB via MSYS2 (UCRT64)
+- **Compilador / Debugger:**
+  - **Windows:** GCC (`g++`) e GDB via MSYS2 (UCRT64) ou MSVC
+  - **Linux:** GCC / Clang e GDB (`/usr/bin/gdb`)
+  - **macOS:** Clang / GCC e LLDB (`lldb`)
 
 ---
 
@@ -29,22 +32,24 @@ Utilitário em PowerShell para inicialização rápida de projetos em **C++23** 
 
 Para compilar e depurar os projetos gerados sem configurações manuais adicionais:
 
-1. **PowerShell**: PowerShell 7+ (recomendado) ou Windows PowerShell.
+1. **PowerShell**: PowerShell 7+ (`pwsh` no Windows, Linux ou macOS) ou Windows PowerShell 5.1.
 2. **CMake**: Versão 3.20 ou superior adicionada ao `PATH`.
-3. **MSYS2 (UCRT64)**: Instalado no caminho padrão (`C:\msys64\ucrt64\`), com os seguintes pacotes instalados:
-   - `mingw-w64-ucrt-x86_64-gcc`
-   - `mingw-w64-ucrt-x86_64-gdb`
+3. **Toolchain C++23**:
+   - **Windows (MSYS2 UCRT64 em `C:\msys64\ucrt64\`)**: pacotes `mingw-w64-ucrt-x86_64-gcc` e `mingw-w64-ucrt-x86_64-gdb`.
+   - **Linux**: `g++` (GCC 13+) ou `clang++` (Clang 17+) e `gdb`.
+   - **macOS**: Xcode Command Line Tools (`clang++` e `lldb`) ou Homebrew LLVM/GCC.
 4. **Visual Studio Code**:
    - Extensão **CMake Tools**
-   - Extensão **clangd** (com a análise de código apontando para `compile_commands.json`)
+   - Extensão **C/C++** (`ms-vscode.cpptools`, para o motor de depuração `cppdbg`)
+   - Extensão **clangd** (com análise de código apontando para `compile_commands.json`)
 
 ---
 
 ## 3. Como Usar
 
-Execute o script [`cpp_bootstrap.ps1`](cpp_bootstrap.ps1) na raiz do repositório informando o nome do novo projeto:
+Execute o script [`cpp_bootstrap.ps1`](cpp_bootstrap.ps1) informando o nome do novo projeto:
 
-### No Windows:
+### No Windows (PowerShell 7+ ou Windows PowerShell 5.1):
 ```powershell
 ./cpp_bootstrap.ps1 MeuProjeto
 ```
@@ -54,18 +59,26 @@ Execute o script [`cpp_bootstrap.ps1`](cpp_bootstrap.ps1) na raiz do repositóri
 pwsh ./cpp_bootstrap.ps1 MeuProjeto
 ```
 
-### Validações de Nome Embutidas
-O script realiza checagens automáticas de segurança antes de criar qualquer arquivo:
-- Rejeita nomes vazios ou que terminem com ponto final `.` ou espaço (regras de sistema de arquivos do Windows).
-- Bloqueia caracteres proibidos (`\ / : * ? " < > |` ou nulos).
-- Impede o uso de palavras reservadas do sistema (ex.: `CON`, `PRN`, `AUX`, `NUL`, `COM1-9`, `LPT1-9`).
-- Impede a sobrescrita acidental se uma pasta com o mesmo nome já existir no diretório atual.
+### Modo Enxuto (`-Quiet`):
+Opcionalmente, suprima o rodapé de autoria e links ao usar o script em automações:
+```powershell
+./cpp_bootstrap.ps1 MeuProjeto -Quiet
+```
+
+### Validações de Nome e Segurança Embutidas
+O script normaliza espaços/aspas externas uma única vez e aplica regras uniformes em todos os sistemas operacionais (garantindo portabilidade via Git e integridade do `CMakeLists.txt`):
+- Rejeita nomes vazios ou compostos apenas por espaços.
+- Rejeita nomes terminados com ponto final `.` (restrição de filesystem do Windows preservada para portabilidade).
+- Impede o uso de dispositivos reservados do Windows (`CON`, `PRN`, `AUX`, `NUL`, `COM1-9`, `LPT1-9`).
+- Aceita exclusivamente caracteres seguros para CMake e filesystems multiplataforma (`^[A-Za-z0-9_][A-Za-z0-9_-]*$`), bloqueando espaços internos (`"Meu Projeto"`), caracteres especiais (`\ / : * ? " < > |`) e início com `-`.
+- Impede a sobrescrita acidental se uma pasta ou arquivo com o mesmo nome já existir no diretório atual.
+- Não altera o diretório atual do terminal do usuário e remove a pasta criada automaticamente em caso de falha inesperada de I/O (*rollback* transacional).
 
 ---
 
 ## 4. Estrutura de Diretórios Gerada
 
-Ao criar um projeto, a seguinte árvore é gerada:
+Ao criar um projeto, a seguinte árvore é gerada em **UTF-8 sem BOM** e quebras de linha **LF**:
 
 ```text
 MeuProjeto/
@@ -83,18 +96,18 @@ MeuProjeto/
 
 | Arquivo | Descrição |
 | :--- | :--- |
-| `src/main.cpp` | Código de partida com suporte a acentuação em português (`std::setlocale`), cabeçalho de autoria e pausa de terminal. |
+| `src/main.cpp` | Código de partida com locale portável do ambiente (`std::setlocale(LC_ALL, "")`), cabeçalho de autoria e pausa de terminal. |
 | `include/` | Diretório dedicado para arquivos de cabeçalho (`.hpp` / `.h`). |
-| `.vscode/launch.json` | Configuração de depuração pronta (`cppdbg`) apontando para `C:/msys64/ucrt64/bin/gdb.exe` e ativando pretty-printing. |
-| `.vscode/settings.json` | Configuração que habilita `compile_commands.json` e direciona o `clangd` para o compilador do MSYS2. |
-| `CMakeLists.txt` | Configuração CMake completa com C++23, inclusão de `include/`, fontes em `src/*.cpp` e flags de aviso rigorosas (`/W4` no MSVC, `-Wall -Wextra -Wconversion -Wsign-conversion -pedantic-errors` no GCC/Clang). |
-| `.gitignore` | Regras prontas para ignorar pastas de build (`build/`, `out/`), binários (`*.exe`, bibliotecas, objetos) e caches locais de IDE. |
+| `.vscode/launch.json` | Configuração de depuração multiplataforma (`cppdbg`) com blocos dedicados para `windows` (MSYS2 GDB), `linux` (`/usr/bin/gdb`) e `osx` (`lldb`). |
+| `.vscode/settings.json` | Habilita `compile_commands.json` e configura o `--query-driver` do `clangd` para compiladores no Windows (MSYS2), Linux e macOS. |
+| `CMakeLists.txt` | Configuração CMake com C++23 estrito, `CMAKE_BUILD_TYPE` padrão `Debug` não-destrutivo (respeita `-DCMAKE_BUILD_TYPE=Release` e geradores multi-config), inclusão de `include/`, coleta em `src/*.cpp` e flags rigorosas (`/W4 /permissive- /EHsc` no MSVC; `-Wall -Wextra -Wconversion -Wsign-conversion -pedantic-errors` no GCC/Clang). |
+| `.gitignore` | Ignora pastas de build (`build/`, `out/`), binários e caches locais do `.vscode/*`, preservando `!.vscode/launch.json` e `!.vscode/settings.json` no controle de versão. |
 
 ---
 
 ## 5. Compilação e Execução
 
-Após gerar o projeto, navegue até a pasta criada:
+Após gerar o projeto, entre na pasta criada:
 
 ```powershell
 cd MeuProjeto
@@ -102,85 +115,87 @@ code .
 ```
 
 ### Depuração no Visual Studio Code:
-- Pressione **F5** para iniciar a compilação automática e depurar com o GDB integrado.
+- Pressione **F5** para compilar automaticamente e iniciar o depurador da plataforma atual (`gdb` ou `lldb`).
 
 ### Compilação Manual via Terminal:
 ```powershell
-# 1. Gerar os arquivos de build
+# 1. Configurar os arquivos de build (padrão Debug; opcional: -DCMAKE_BUILD_TYPE=Release)
 cmake -B build
 
 # 2. Compilar o projeto
 cmake --build build
 
-# 3. Executar o binário gerado (Windows)
+# 3. Executar o binário gerado
+# Windows:
 ./build/MeuProjeto.exe
+# Linux / macOS:
+./build/MeuProjeto
 ```
 
 ---
 
 ## 6. Ambiente de Testes Automatizados
 
-O repositório inclui uma suíte completa de testes automatizados em [`tests/test_cpp_bootstrap.ps1`](tests/test_cpp_bootstrap.ps1), projetada para validar a integridade sintática, as regras de segurança/validação de nomes, a correta geração de todos os arquivos e modelos, além de permitir o teste de compilação real de ponta a ponta.
+O repositório inclui uma suíte completa de testes automatizados em [`tests/test_cpp_bootstrap.ps1`](tests/test_cpp_bootstrap.ps1), projetada para validar a segurança de parsing/encoding, as regras de validação de nomes, o isolamento de diretório, a geração de todos os templates, a compatibilidade direta com Windows PowerShell 5.1 e a compilação C++23 real de ponta a ponta.
 
 ### 6.1. Arquitetura e Princípios
 
-1. **Isolamento Total (Sandbox Temporário):**
-   - Os testes nunca criam arquivos dentro da árvore do repositório.
-   - Cada execução cria uma pasta temporária exclusiva em `$env:TEMP` com um GUID aleatório.
-   - O `Set-Location` interno do [`cpp_bootstrap.ps1`](cpp_bootstrap.ps1) não afeta o shell do usuário, pois cada teste roda em um subprocesso filho isolado (`System.Diagnostics.Process`).
+1. **Blindagem de Parsing e Encoding (ASCII 7-bit / UTF-8 sem BOM):**
+   - Os scripts `.ps1` contêm exclusivamente bytes ASCII 7-bit (`<= 0x7F`) sem BOM e utilizam `[char]27` para sequências ANSI quando o terminal suporta VT, eliminando erros de lexer e *mojibake* em qualquer codepage do Windows PowerShell 5.1 e do PowerShell 7+.
 
-2. **Teardown Automático:**
-   - Ao final da execução (mesmo se ocorrer falha ou cancelamento abrupto), o bloco `finally` remove a pasta temporária do disco de forma limpa.
+2. **Isolamento Total (Sandbox Temporário) e Teardown Automático:**
+   - Nenhum teste cria artefatos dentro da árvore do repositório; cada execução utiliza uma pasta temporária exclusiva com GUID em `[System.IO.Path]::GetTempPath()` removida automaticamente no bloco `finally`.
 
-3. **Compatibilidade Multiplataforma:**
-   - Funciona em **PowerShell 7+ (`pwsh`)** e **Windows PowerShell 5.1**.
-   - Se invocado a partir do Windows PowerShell 5.1 e o `pwsh` estiver presente no sistema, o script delega a execução automaticamente para o PowerShell 7 para garantir suporte completo a sequências ANSI e UTF-8 sem BOM.
+3. **Execução Nativa Multi-Interpretador:**
+   - Roda nativamente tanto no **PowerShell 7+ (`pwsh`)** (Windows, Linux e macOS) quanto diretamente no **Windows PowerShell 5.1 (`powershell.exe`)**, sem mascarar falhas de nenhum interpretador.
 
 ---
 
-### 6.2. Matriz dos 14 Cenários de Teste
+### 6.2. Matriz dos 19 Cenários de Teste
 
 | Nº | Categoria | Descrição do Teste | Critério de Sucesso |
 | :--- | :--- | :--- | :--- |
-| **01** | **Sintaxe** | Análise estática da AST do script via `[System.Management.Automation.Language.Parser]` | Sem erros de parsing no PowerShell |
+| **01** | **Sintaxe & Encoding** | Auditoria estática de bytes e AST (`Parser::ParseFile`) nos scripts `.ps1` | Sem BOM, 100% bytes ASCII `<= 0x7F` e zero erros de parsing |
 | **02** | **Validação** | Chamada sem argumentos (`./cpp_bootstrap.ps1`) | Exit code `1` e exibição do tutorial de uso |
-| **03** | **Validação** | Nome vazio ou apenas espaços (`""`, `"   "`) | Exit code `2` e mensagem `"Nome do projeto vazio"` |
-| **04** | **Validação** | Caracteres proibidos no sistema de arquivos (`< > : " / \ \| ? *`) | Exit code `2` e alerta de caracteres proibidos |
-| **05** | **Validação** | Nome terminando com ponto final `.` ou espaço (regra Windows) | Exit code `2` e alerta da restrição de sistema |
-| **06** | **Validação** | Nomes de dispositivos reservados do Windows (`CON`, `PRN`, `AUX`, `NUL`, etc.) | Exit code `2` e alerta de nome reservado |
-| **07** | **Segurança** | Prevenção de sobrescrita acidental em pasta preexistente | Exit code `2` e aviso de pasta existente sem alterar nada |
-| **08** | **Criação** | Execução com nome de projeto válido (`ProjetoTesteSucesso`) | Exit code `0` e mensagem de confirmação |
-| **09** | **Estrutura** | Verificação das pastas geradas | Pastas raiz, `src/`, `include/` e `.vscode/` presentes |
-| **10** | **Artefatos** | Integridade do código C++ (`src/main.cpp`) | Presença de `int main()`, `#include <iostream>` e `std::setlocale` |
-| **11** | **Artefatos** | Configurações do VS Code (`launch.json` e `settings.json`) | Arquivos JSON válidos com configurações corretas de debug e clangd |
-| **12** | **Artefatos** | Configuração de compilação (`CMakeLists.txt`) | Template substituído, `C++23` estrito e flags de compilação presentes |
-| **13** | **Artefatos** | Regras de versão (`.gitignore`) | Presença de exclusões de `build/`, `out/`, binários e caches de IDE |
-| **14** | **Integração** | Compilação real de ponta a ponta com CMake e `g++` | Executável C++23 gerado com sucesso sem erros |
+| **03** | **Validação** | Nome vazio ou apenas espaços (`""`, `"   "`, `'""'`) | Exit code `2` e mensagem `"Nome do projeto vazio"` |
+| **04** | **Validação** | Caracteres proibidos no sistema de arquivos (`Projeto<Invalido>`) | Exit code `2` e alerta de caracteres proibidos |
+| **05** | **Validação** | Nome com espaço interno (`"Meu Projeto"`) ou múltiplos tokens sem aspas | Exit code `2` protegendo a sintaxe do `CMakeLists.txt` |
+| **06** | **Validação** | Nome terminando com ponto final `.` | Exit code `2` em todas as plataformas |
+| **07** | **Validação** | Nomes de dispositivos reservados (`CON`, `PRN`, `AUX`, `NUL`, etc.) | Exit code `2` em todas as plataformas |
+| **08** | **Segurança** | Prevenção de sobrescrita em pasta ou arquivo preexistente | Exit code `2` sem modificar o item existente |
+| **09** | **Normalização** | Nome com espaços externos (`"  ProjetoTrimado  "`) | Exit code `0`, pasta exata `ProjetoTrimado` e CMake sincronizado |
+| **10** | **Isolamento** | Execução *in-process* (`& ./cpp_bootstrap.ps1 ... -Quiet`) | Diretório atual (`Get-Location`) permanece inalterado |
+| **11** | **Criação** | Execução com nome válido (`ProjetoTesteSucesso`) | Exit code `0` e instruções `cmake -B build` / `cmake --build build` |
+| **12** | **Estrutura** | Verificação das pastas obrigatórias | Pastas raiz, `src/`, `include/` e `.vscode/` presentes |
+| **13** | **Artefatos** | Integridade de `src/main.cpp` | Presença de `int main()`, `<iostream>`, `<clocale>` e `std::setlocale(LC_ALL, "")` |
+| **14** | **Artefatos** | Configurações multiplataforma do VS Code (`launch.json` e `settings.json`) | JSON válido com blocos `windows`/`linux`/`osx` e `--query-driver` multi-SO |
+| **15** | **Artefatos** | Configuração do `CMakeLists.txt` | Template substituído, `C++23` estrito, guarda de `CMAKE_BUILD_TYPE` e flags rigorosas |
+| **16** | **Artefatos** | Regras do `.gitignore` gerado | Ignora `build/`, binários e `.vscode/*`, preservando `!.vscode/launch.json` e `!.vscode/settings.json` |
+| **17** | **Encoding** | Auditoria binária dos 5 arquivos gerados | Todos estritamente em UTF-8 sem BOM e fim de linha LF |
+| **18** | **Compatibilidade** | Execução direta no Windows PowerShell 5.1 (`powershell.exe`) | Exit code `0`, sem vazamento ANSI `e[` e sem gravação de BOM (`SKIP` fora do Windows) |
+| **19** | **Integração** | Compilação C++23 real com CMake (`-DCMAKE_BUILD_TYPE=Release`) | Executável compilado com sucesso e `CMAKE_BUILD_TYPE` respeitado |
 
 ---
 
 ### 6.3. Como Executar os Testes
 
-#### 1. Execução Padrão (Sintaxe, Validações e Estrutura)
+#### 1. Execução Padrão (Sintaxe, Validações, Isolamento e Estrutura)
 ```powershell
 ./tests/test_cpp_bootstrap.ps1
 ```
 *(No Linux ou macOS: `pwsh ./tests/test_cpp_bootstrap.ps1`)*
 
-#### 2. Execução Completa com Compilação Real C++23 (CMake + g++)
-Testa a geração e compila o código do projeto gerado para validar que o `CMakeLists.txt` e o `src/main.cpp` compilam sem warnings/erros:
+#### 2. Execução Completa com Compilação Real C++23 (CMake + Compilador C++)
 ```powershell
 ./tests/test_cpp_bootstrap.ps1 -IncludeBuild
 ```
 
 #### 3. Modo Detalhado (Verbose)
-Exibe a saída bruta (`stdout`/`stderr`) de cada comando e processo invocado internamente:
 ```powershell
 ./tests/test_cpp_bootstrap.ps1 -VerboseOutput
 ```
 
 #### 4. Testar Script Específico
-Permite apontar para outro script de destino para homologação:
 ```powershell
 ./tests/test_cpp_bootstrap.ps1 -TargetScript "caminho/para/outro_script.ps1"
 ```
@@ -189,9 +204,5 @@ Permite apontar para outro script de destino para homologação:
 
 ### 6.4. Códigos de Saída do Runner (Exit Codes)
 
-O script [`test_cpp_bootstrap.ps1`](tests/test_cpp_bootstrap.ps1) segue convenções padrão para integração contínua (CI/CD):
-
-- **`0`**: Todos os testes passaram com sucesso.
+- **`0`**: Todos os testes executados passaram com sucesso.
 - **`1`**: Um ou mais testes falharam ou erro crítico impediu a execução.
-
-

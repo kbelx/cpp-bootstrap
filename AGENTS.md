@@ -6,7 +6,7 @@ Este projeto é um gerador de estrutura de diretórios e arquivos de configuraç
 O agente deve ajudar a:
 - Manter consistência estrutural e integridade dos templates gerados.
 - Garantir que a documentação única no `README.md` reflita exatamente o que o script produz.
-- Automatizar tarefas mantendo compatibilidade cross-platform (PowerShell Core / Windows PowerShell).
+- Automatizar tarefas mantendo compatibilidade cross-platform (PowerShell Core 7+ no Windows/Linux/macOS e Windows PowerShell 5.1).
 
 ---
 
@@ -38,7 +38,7 @@ MeuProjeto/
 O script gera um arquivo `CMakeLists.txt` configurado com:
 - `cmake_minimum_required(VERSION 3.20)`
 - `set(CMAKE_CXX_STANDARD 23)` e `set(CMAKE_CXX_STANDARD_REQUIRED ON)`
-- `set(CMAKE_BUILD_TYPE Debug)`
+- `CMAKE_BUILD_TYPE` padrão `Debug` não-destrutivo em geradores *single-config* (`if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)`)
 - Coleta de fontes via `file(GLOB_RECURSE PROJECT_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp")`
 - Diretório de cabeçalhos privado apontando para `include`
 - Flags rigorosas de compilação:
@@ -49,11 +49,11 @@ O script gera um arquivo `CMakeLists.txt` configurado com:
 
 ## 4. Comportamento Esperado
 
-- Sempre criar diretórios antes de criar arquivos.
-- Nunca sobrescrever arquivos sem confirmação do usuário.
+- Sempre criar diretórios antes de criar arquivos, sem alterar o diretório atual do terminal (`Set-Location` proibido) e com rollback caso ocorra falha na geração.
+- Nunca sobrescrever arquivos ou pastas existentes sem confirmação do usuário.
 - Usar nomes em `snake_case` para scripts e arquivos auxiliares.
 - Manter código limpo, comentado e interativo, evitando comandos desnecessários ou código morto.
-- Manter a codificação estritamente em UTF-8 sem BOM.
+- Manter a codificação estritamente em **UTF-8 sem BOM** com fim de linha **LF**; nos scripts `.ps1`, manter apenas caracteres **ASCII 7-bit (`<= 0x7F`)** e `[char]27` para sequências ANSI a fim de eliminar falhas de parsing e *mojibake* no Windows PowerShell 5.1.
 
 ---
 
@@ -67,4 +67,9 @@ O script gera um arquivo `CMakeLists.txt` configurado com:
 ### Criar projeto (Linux ou macOS)
 ```powershell
 pwsh ./cpp_bootstrap.ps1 NomeDoProjeto
+```
+
+### Modo enxuto (sem rodapé de autoria)
+```powershell
+./cpp_bootstrap.ps1 NomeDoProjeto -Quiet
 ```

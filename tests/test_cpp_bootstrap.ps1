@@ -1,17 +1,20 @@
 <#
 .SYNOPSIS
-Suíte de testes automatizados para cpp_bootstrap.ps1.
+Suite de testes automatizados para cpp_bootstrap.ps1.
 
 .DESCRIPTION
-Executa testes unitários, de validação e de integração para o gerador
-de projetos C++ (cpp_bootstrap.ps1). Executa em ambiente isolado (pasta temporária)
-sem modificar os arquivos do repositório ou o diretório de trabalho do usuário.
+Executa testes estaticos (AST/encoding), unitarios, de validacao, isolamento,
+compatibilidade Windows PowerShell 5.1 / PowerShell 7+ e integracao real C++23 com CMake.
+Roda em sandbox temporario isolado sem alterar arquivos do repositorio nem o diretorio atual.
 
 .PARAMETER IncludeBuild
-Quando especificado, também compila o projeto gerado usando CMake e o compilador C++23.
+Quando especificado, configura e compila o projeto gerado com CMake e um compilador C++23.
 
 .PARAMETER VerboseOutput
-Exibe os logs detalhados (stdout/stderr) dos comandos executados durante os testes.
+Exibe stdout/stderr detalhados dos subprocessos executados durante os testes.
+
+.PARAMETER TargetScript
+Caminho opcional para um script alternativo a ser homologado.
 
 .EXAMPLE
 ./tests/test_cpp_bootstrap.ps1
@@ -20,7 +23,7 @@ Exibe os logs detalhados (stdout/stderr) dos comandos executados durante os test
 ./tests/test_cpp_bootstrap.ps1 -IncludeBuild
 
 .EXAMPLE
-pwsh ./tests/test_cpp_bootstrap.ps1 -VerboseOutput
+pwsh ./tests/test_cpp_bootstrap.ps1 -IncludeBuild -VerboseOutput
 #>
 
 [CmdletBinding()]
@@ -30,66 +33,70 @@ param (
     [string]$TargetScript
 )
 
-# Se executado no Windows PowerShell 5.1 e o pwsh (PowerShell 7+) estiver disponivel,
-# delega para pwsh para garantir compatibilidade completa com UTF-8 sem BOM e sequencias ANSI.
-if ($PSVersionTable.PSEdition -ne "Core") {
-    $pwshCmd = Get-Command "pwsh" -ErrorAction SilentlyContinue
-    if ($pwshCmd) {
-        $forwardArgs = @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $PSCommandPath)
-        if ($PSBoundParameters.Count -gt 0) {
-            foreach ($key in $PSBoundParameters.Keys) {
-                $val = $PSBoundParameters[$key]
-                if ($val -is [switch] -and $val.IsPresent) {
-                    $forwardArgs += "-$key"
-                } elseif ($val -isnot [switch]) {
-                    $forwardArgs += "-$key"
-                    $forwardArgs += "$val"
-                }
-            }
-        }
-        & $pwshCmd.Source $forwardArgs
-        exit $LASTEXITCODE
-    }
-}
+$ErrorActionPreference = "Stop"
 
-# Determina o interpretador do PowerShell atual para invocar os subprocessos isolados
+#========================== [ DETECCAO DE AMBIENTE ] ===========================
+
+$isWin = ($PSVersionTable.PSEdition -eq "Desktop") -or
+         ($env:OS -eq "Windows_NT") -or
+         ((Test-Path Variable:\IsWindows) -and [bool](Get-Variable -Name IsWindows -ValueOnly))
+$isMac = (-not $isWin) -and
+         ((Test-Path Variable:\IsMacOS) -and [bool](Get-Variable -Name IsMacOS -ValueOnly))
+
 $psExe = if ($PSVersionTable.PSEdition -eq "Core") { "pwsh" } else { "powershell" }
 
-# Localiza o script principal a ser testado
 if (-not $TargetScript) {
     $TargetScript = Join-Path -Path $PSScriptRoot -ChildPath "..\cpp_bootstrap.ps1"
 }
 $TargetScript = [System.IO.Path]::GetFullPath($TargetScript)
+$SelfScript   = [System.IO.Path]::GetFullPath($PSCommandPath)
 
 if (-not (Test-Path -LiteralPath $TargetScript -PathType Leaf)) {
-    Write-Error "Script alvo não encontrado: $TargetScript"
+    Write-Error "Script alvo nao encontrado: $TargetScript"
     exit 1
 }
 
-# Paleta de cores para saída formatada
-$RESET  = "`e[0m"
-$GREEN  = "`e[32m"
-$CYAN   = "`e[36m"
-$BLUE   = "`e[34m"
-$GRAY   = "`e[90m"
-$YELLOW = "`e[33m"
-$RED    = "`e[31m"
-$BOLD   = "`e[1m"
-
-$script:TotalTests  = 0
-$script:PassedTests = 0
-$script:FailedTests = 0
-$script:SkippedTests = 0
-
-function Write-Header {
-    param([string]$Title)
-    Write-Host ""
-    Write-Host "$GRAY━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━$RESET"
-    Write-Host "$BOLD$CYAN$Title$RESET"
-    Write-Host "$GRAY━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━$RESET"
+$isRedirected = $false
+try {
+    $isRedirected = [Console]::IsOutputRedirected
+}
+catch {
+    $isRedirected = $true
 }
 
-function Run-Test {
+$hasVtProp = ($null -ne $Host.UI) -and ($null -ne $Host.UI.PSObject.Properties["SupportsVirtualTerminal"])
+$useAnsi   = $hasVtProp -and
+             [bool]$Host.UI.SupportsVirtualTerminal -and
+             (-not $isRedirected) -and
+             ([string]::IsNullOrEmpty($env:NO_COLOR))
+
+#============================ [ PALETA / FUNCOES ] =============================
+
+$ESC    = if ($useAnsi) { [string][char]27 } else { "" }
+$RESET  = if ($useAnsi) { "$ESC[0m" }  else { "" }
+$GREEN  = if ($useAnsi) { "$ESC[32m" } else { "" }
+$CYAN   = if ($useAnsi) { "$ESC[36m" } else { "" }
+$GRAY   = if ($useAnsi) { "$ESC[90m" } else { "" }
+$YELLOW = if ($useAnsi) { "$ESC[33m" } else { "" }
+$RED    = if ($useAnsi) { "$ESC[31m" } else { "" }
+$BOLD   = if ($useAnsi) { "$ESC[1m" }  else { "" }
+
+$divider = "$GRAY------------------------------------------------------------$RESET"
+
+$script:TotalTests   = 0
+$script:PassedTests  = 0
+$script:FailedTests  = 0
+$script:SkippedTests = 0
+
+function Write-SectionHeader {
+    param([string]$Title)
+    Write-Host ""
+    Write-Host $divider
+    Write-Host "$BOLD$CYAN$Title$RESET"
+    Write-Host $divider
+}
+
+function Invoke-Test {
     param(
         [string]$Name,
         [scriptblock]$Assertion
@@ -101,20 +108,21 @@ function Run-Test {
         $result = & $Assertion
         if ($result -or ($null -eq $result)) {
             $script:PassedTests++
-            Write-Host "  $GREEN[PASS]$RESET Teste $($testNumber): $Name"
-        } else {
+            Write-Host "  $GREEN[PASS]$RESET Teste ${testNumber}: $Name"
+        }
+        else {
             $script:FailedTests++
-            Write-Host "  $RED[FAIL]$RESET Teste $($testNumber): $Name (Asserção retornou falso)"
+            Write-Host "  $RED[FAIL]$RESET Teste ${testNumber}: $Name (Assercao retornou falso)"
         }
     }
     catch {
         $script:FailedTests++
-        Write-Host "  $RED[FAIL]$RESET Teste $($testNumber): $Name"
+        Write-Host "  $RED[FAIL]$RESET Teste ${testNumber}: $Name"
         Write-Host "         $RED-> Erro:$RESET $($_.Exception.Message)"
     }
 }
 
-function Run-Skip {
+function Invoke-Skip {
     param(
         [string]$Name,
         [string]$Reason
@@ -122,40 +130,47 @@ function Run-Skip {
     $script:TotalTests++
     $script:SkippedTests++
     $testNumber = "{0:D2}" -f $script:TotalTests
-    Write-Host "  $YELLOW[SKIP]$RESET Teste $($testNumber): $Name ($Reason)"
+    Write-Host "  $YELLOW[SKIP]$RESET Teste ${testNumber}: $Name ($Reason)"
 }
 
-function Invoke-BootstrapIsolated {
+function Invoke-ExternalProcess {
     param(
-        [string[]]$ScriptArguments,
-        [string]$WorkingDirectory
+        [Parameter(Mandatory = $true)][string]$FilePath,
+        [AllowEmptyCollection()][AllowEmptyString()][string[]]$ArgumentList = @(),
+        [Parameter(Mandatory = $true)][string]$WorkingDirectory
     )
 
     $startInfo = New-Object System.Diagnostics.ProcessStartInfo
-    $startInfo.FileName = $psExe
-    
-    # Monta a linha de comando para o processo filho
-    $argList = @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "`"$TargetScript`"")
-    if ($ScriptArguments) {
-        foreach ($arg in $ScriptArguments) {
-            $argList += "`"$arg`""
+    $startInfo.FileName               = $FilePath
+    $startInfo.WorkingDirectory       = $WorkingDirectory
+    $startInfo.RedirectStandardOutput = $true
+    $startInfo.RedirectStandardError  = $true
+    $startInfo.UseShellExecute        = $false
+    $startInfo.CreateNoWindow         = $true
+
+    if ($null -ne $startInfo.PSObject.Properties["ArgumentList"]) {
+        foreach ($arg in $ArgumentList) {
+            [void]$startInfo.ArgumentList.Add($arg)
         }
     }
-    
-    $startInfo.Arguments = $argList -join " "
-    $startInfo.WorkingDirectory = $WorkingDirectory
-    $startInfo.RedirectStandardOutput = $true
-    $startInfo.RedirectStandardError = $true
-    $startInfo.UseShellExecute = $false
-    $startInfo.CreateNoWindow = $true
+    else {
+        $quotedArgs = foreach ($arg in $ArgumentList) {
+            $escaped = $arg -replace '(\\*)"', '$1$1\"' -replace '(\\+)$', '$1$1'
+            "`"$escaped`""
+        }
+        $startInfo.Arguments = $quotedArgs -join " "
+    }
 
     $process = New-Object System.Diagnostics.Process
     $process.StartInfo = $startInfo
 
-    $null = $process.Start()
-    $stdout = $process.StandardOutput.ReadToEnd()
-    $stderr = $process.StandardError.ReadToEnd()
+    [void]$process.Start()
+    $stdoutTask = $process.StandardOutput.ReadToEndAsync()
+    $stderrTask = $process.StandardError.ReadToEndAsync()
     $process.WaitForExit()
+
+    $stdout = $stdoutTask.GetAwaiter().GetResult()
+    $stderr = $stderrTask.GetAwaiter().GetResult()
 
     if ($VerboseOutput) {
         if ($stdout) { Write-Host "$GRAY[STDOUT] $stdout$RESET" }
@@ -169,285 +184,490 @@ function Invoke-BootstrapIsolated {
     }
 }
 
-# Criação do diretório temporário de testes (sandbox)
+function Invoke-BootstrapIsolated {
+    param(
+        [AllowEmptyCollection()][AllowEmptyString()][string[]]$ScriptArguments = @(),
+        [Parameter(Mandatory = $true)][string]$WorkingDirectory,
+        [string]$ShellExecutable = $psExe
+    )
+
+    $fullArgs = @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $TargetScript)
+    if ($null -ne $ScriptArguments -and $ScriptArguments.Count -gt 0) {
+        $fullArgs += $ScriptArguments
+    }
+
+    return Invoke-ExternalProcess -FilePath $ShellExecutable -ArgumentList $fullArgs -WorkingDirectory $WorkingDirectory
+}
+
+function Test-HasUtf8Bom {
+    param([Parameter(Mandatory = $true)][string]$Path)
+    $bytes = [System.IO.File]::ReadAllBytes($Path)
+    return ($bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF)
+}
+
+#====================== [ EXECUCAO EM SANDBOX ISOLADO ] ========================
+
 $tempRoot = Join-Path -Path ([System.IO.Path]::GetTempPath()) -ChildPath ("cpp_bootstrap_tests_" + [System.Guid]::NewGuid().ToString("N"))
 New-Item -ItemType Directory -Path $tempRoot -Force | Out-Null
 
 $startTime = [System.Diagnostics.Stopwatch]::StartNew()
 
 try {
-    Write-Header "[TEST SUITE] cpp_bootstrap.ps1"
+    $osName = if ($isWin) { "Windows" } elseif ($isMac) { "macOS" } else { "Linux" }
+    Write-SectionHeader "[TEST SUITE] cpp_bootstrap.ps1"
     Write-Host "$GRAY* Script sob teste :$RESET $TargetScript"
-    Write-Host "$GRAY* Ambiente de teste :$RESET $tempRoot"
-    Write-Host "$GRAY* Interpretador     :$RESET $psExe ($($PSVersionTable.PSVersion))"
+    Write-Host "$GRAY* Ambiente sandbox :$RESET $tempRoot"
+    Write-Host "$GRAY* Interpretador    :$RESET $psExe ($($PSVersionTable.PSVersion)) em $osName"
 
     # --------------------------------------------------------------------------
-    # 1. Testes de Sintaxe e Análise Estática
+    # 1. Verificacao Estatica de Sintaxe, Encoding e Seguranca de Parsing
     # --------------------------------------------------------------------------
-    Write-Header "1. Verificação Estática de Sintaxe"
+    Write-SectionHeader "1. Verificacao Estatica de Sintaxe e Encoding"
 
-    Run-Test "Sintaxe do script é válida (sem erros de parsing no PowerShell)" {
-        $tokens = $null
-        $errors = $null
-        $null = [System.Management.Automation.Language.Parser]::ParseFile($TargetScript, [ref]$tokens, [ref]$errors)
-        if ($errors -and $errors.Count -gt 0) {
-            $msg = ($errors | ForEach-Object { $_.Message }) -join "; "
-            throw "Erros de sintaxe encontrados: $msg"
+    Invoke-Test "Scripts .ps1 estao em UTF-8 sem BOM, 100% ASCII 7-bit e sem erros de AST" {
+        foreach ($scriptPath in @($TargetScript, $SelfScript)) {
+            $name = [System.IO.Path]::GetFileName($scriptPath)
+
+            if (Test-HasUtf8Bom -Path $scriptPath) {
+                throw "BOM UTF-8 detectado em $name (violacao da regra UTF-8 sem BOM)"
+            }
+
+            $bytes = [System.IO.File]::ReadAllBytes($scriptPath)
+            for ($i = 0; $i -lt $bytes.Length; $i++) {
+                if ($bytes[$i] -gt 0x7F) {
+                    throw "Byte nao-ASCII (0x$($bytes[$i].ToString('X2'))) na posicao $i de $name (risco de falha de parsing no PS 5.1)"
+                }
+            }
+
+            $tokens = $null
+            $errors = $null
+            [void][System.Management.Automation.Language.Parser]::ParseFile($scriptPath, [ref]$tokens, [ref]$errors)
+            if ($null -ne $errors -and $errors.Count -gt 0) {
+                $msg = ($errors | ForEach-Object { $_.Message }) -join "; "
+                throw "Erros de sintaxe em ${name}: $msg"
+            }
         }
         return $true
     }
 
     # --------------------------------------------------------------------------
-    # 2. Testes de Validação de Parâmetros e Segurança (Casos de Falha)
+    # 2. Validacao de Argumentos, Seguranca no CMake e Prevencao de Erros
     # --------------------------------------------------------------------------
-    Write-Header "2. Validação de Argumentos e Prevenção de Erros"
+    Write-SectionHeader "2. Validacao de Argumentos e Prevencao de Erros"
 
-    Run-Test "Execução sem argumentos exibe tutorial e encerra com código 1" {
+    Invoke-Test "Execucao sem argumentos exibe tutorial e encerra com codigo 1" {
         $res = Invoke-BootstrapIsolated -ScriptArguments @() -WorkingDirectory $tempRoot
         if ($res.ExitCode -ne 1) { throw "Esperado exit code 1, obtido $($res.ExitCode)" }
         if ($res.StdOut -notmatch "Uso:" -or $res.StdOut -notmatch "Dica:") {
-            throw "Tutorial de uso não foi exibido na saída"
+            throw "Tutorial de uso nao foi exibido na saida"
         }
         return $true
     }
 
-    Run-Test "Nome de projeto vazio deve encerrar com código 2 e mensagem descritiva" {
-        $res = Invoke-BootstrapIsolated -ScriptArguments @('""') -WorkingDirectory $tempRoot
-        if ($res.ExitCode -ne 2) { throw "Esperado exit code 2, obtido $($res.ExitCode)" }
-        if ($res.StdOut -notmatch "Nome do projeto vazio") {
-            throw "Mensagem de 'Nome do projeto vazio' não encontrada"
+    Invoke-Test "Nome de projeto vazio ou apenas espacos encerra com codigo 2" {
+        foreach ($emptyInput in @("", "   ", '""')) {
+            $res = Invoke-BootstrapIsolated -ScriptArguments @($emptyInput) -WorkingDirectory $tempRoot
+            if ($res.ExitCode -ne 2) {
+                throw "Entrada '$emptyInput': esperado exit code 2, obtido $($res.ExitCode)"
+            }
+            if ($res.StdOut -notmatch "Nome do projeto vazio") {
+                throw "Entrada '$emptyInput': mensagem 'Nome do projeto vazio' ausente"
+            }
         }
         return $true
     }
 
-    Run-Test "Nome contendo caracteres proibidos deve ser rejeitado com código 2" {
-        $badName = "Projeto<Invalido>"
-        $res = Invoke-BootstrapIsolated -ScriptArguments @($badName) -WorkingDirectory $tempRoot
+    Invoke-Test "Nome contendo caracteres proibidos e rejeitado com codigo 2" {
+        $res = Invoke-BootstrapIsolated -ScriptArguments @("Projeto<Invalido>") -WorkingDirectory $tempRoot
         if ($res.ExitCode -ne 2) { throw "Esperado exit code 2, obtido $($res.ExitCode)" }
         if ($res.StdOut -notmatch "Caracteres proibidos encontrados") {
-            throw "Alerta de caracteres proibidos não encontrado na saída"
+            throw "Alerta de caracteres proibidos nao encontrado na saida"
         }
         return $true
     }
 
-    Run-Test "Nome terminando com ponto deve ser rejeitado no Windows com código 2" {
-        if (-not $IsWindows -and $PSVersionTable.Platform -ne "Win32NT") {
-            return $true # Validação específica de regras do Windows
+    Invoke-Test "Nome com espaco interno ou multiplos tokens sem aspas e rejeitado com codigo 2 (protege CMake)" {
+        $resQuoted = Invoke-BootstrapIsolated -ScriptArguments @("Meu Projeto") -WorkingDirectory $tempRoot
+        if ($resQuoted.ExitCode -ne 2) {
+            throw "Nome com espaco entre aspas: esperado exit code 2, obtido $($resQuoted.ExitCode)"
         }
+        if ($resQuoted.StdOut -notmatch "Caracteres proibidos encontrados") {
+            throw "Alerta de caracteres proibidos ausente para nome com espaco interno"
+        }
+
+        $resUnquoted = Invoke-BootstrapIsolated -ScriptArguments @("Meu", "Projeto") -WorkingDirectory $tempRoot
+        if ($resUnquoted.ExitCode -ne 2) {
+            throw "Tokens multiplos sem aspas: esperado exit code 2, obtido $($resUnquoted.ExitCode)"
+        }
+        return $true
+    }
+
+    Invoke-Test "Nome terminando com ponto final e rejeitado em todas as plataformas com codigo 2" {
         $res = Invoke-BootstrapIsolated -ScriptArguments @("ProjetoComPonto.") -WorkingDirectory $tempRoot
         if ($res.ExitCode -ne 2) { throw "Esperado exit code 2, obtido $($res.ExitCode)" }
-        if ($res.StdOut -notmatch "não podem terminar com '\.' ou espaço") {
-            throw "Mensagem de regra do Windows sobre ponto/espaço não encontrada"
+        if ($res.StdOut -notmatch "nao podem terminar com '\.' ou espaco") {
+            throw "Mensagem sobre ponto/espaco final nao encontrada"
         }
         return $true
     }
 
-    Run-Test "Nome reservado do Windows (ex: CON, AUX) deve ser rejeitado com código 2" {
+    Invoke-Test "Nome reservado do Windows (CON, AUX, NUL) e rejeitado em todas as plataformas com codigo 2" {
         $res = Invoke-BootstrapIsolated -ScriptArguments @("CON") -WorkingDirectory $tempRoot
         if ($res.ExitCode -ne 2) { throw "Esperado exit code 2, obtido $($res.ExitCode)" }
         if ($res.StdOut -notmatch "nome reservado do Windows") {
-            throw "Alerta de nome reservado não encontrado na saída"
+            throw "Alerta de nome reservado nao encontrado na saida"
         }
         return $true
     }
 
-    Run-Test "Pasta já existente bloqueia sobrescrita e encerra com código 2" {
-        $existingName = "ProjetoPreExistente"
-        $existingPath = Join-Path -Path $tempRoot -ChildPath $existingName
-        New-Item -ItemType Directory -Path $existingPath -Force | Out-Null
+    Invoke-Test "Pasta ou arquivo ja existente bloqueia sobrescrita e encerra com codigo 2" {
+        $existingDir = Join-Path -Path $tempRoot -ChildPath "ProjetoPreExistente"
+        New-Item -ItemType Directory -Path $existingDir -Force | Out-Null
+        $sentinel = Join-Path -Path $existingDir -ChildPath "sentinela.txt"
+        [System.IO.File]::WriteAllText($sentinel, "intacto")
 
-        $res = Invoke-BootstrapIsolated -ScriptArguments @($existingName) -WorkingDirectory $tempRoot
-        if ($res.ExitCode -ne 2) { throw "Esperado exit code 2, obtido $($res.ExitCode)" }
-        if ($res.StdOut -notmatch "Já existe uma pasta com o nome") {
-            throw "Mensagem de pasta pré-existente não encontrada"
+        $resDir = Invoke-BootstrapIsolated -ScriptArguments @("ProjetoPreExistente") -WorkingDirectory $tempRoot
+        if ($resDir.ExitCode -ne 2) { throw "Pasta existente: esperado exit code 2, obtido $($resDir.ExitCode)" }
+        if ($resDir.StdOut -notmatch "Ja existe uma pasta ou arquivo com o nome") {
+            throw "Mensagem de item pre-existente nao encontrada"
         }
+        if ([System.IO.File]::ReadAllText($sentinel) -ne "intacto") {
+            throw "Conteudo da pasta pre-existente foi modificado indevidamente"
+        }
+
+        $existingFile = Join-Path -Path $tempRoot -ChildPath "ArquivoComMesmoNome"
+        [System.IO.File]::WriteAllText($existingFile, "arquivo")
+        $resFile = Invoke-BootstrapIsolated -ScriptArguments @("ArquivoComMesmoNome") -WorkingDirectory $tempRoot
+        if ($resFile.ExitCode -ne 2) { throw "Arquivo existente: esperado exit code 2, obtido $($resFile.ExitCode)" }
+
         return $true
     }
 
     # --------------------------------------------------------------------------
-    # 3. Testes de Criação e Integridade da Estrutura (Caso de Sucesso)
+    # 3. Normalizacao, Isolamento de Diretorio e Criacao da Estrutura
     # --------------------------------------------------------------------------
-    Write-Header "3. Criação de Projeto Válido e Estrutura Gerada"
+    Write-SectionHeader "3. Normalizacao, Isolamento e Estrutura Gerada"
+
+    Invoke-Test "Espacos externos sofrem trim unico e criam a pasta exata sem espacos nas bordas" {
+        $res = Invoke-BootstrapIsolated -ScriptArguments @("  ProjetoTrimado  ") -WorkingDirectory $tempRoot
+        if ($res.ExitCode -ne 0) { throw "Esperado exit code 0, obtido $($res.ExitCode)" }
+
+        $trimmedDir = Join-Path -Path $tempRoot -ChildPath "ProjetoTrimado"
+        $untrimmedDir = Join-Path -Path $tempRoot -ChildPath "  ProjetoTrimado  "
+
+        if (-not (Test-Path -LiteralPath $trimmedDir -PathType Container)) {
+            throw "Pasta normalizada 'ProjetoTrimado' nao foi criada"
+        }
+        if ((Get-ChildItem -LiteralPath $tempRoot -Directory | Where-Object { $_.Name -ne $_.Name.Trim() }).Count -gt 0) {
+            throw "Foi criada uma pasta com espaco no inicio ou no fim ($untrimmedDir)"
+        }
+
+        $cmakeText = [System.IO.File]::ReadAllText((Join-Path -Path $trimmedDir -ChildPath "CMakeLists.txt"))
+        if ($cmakeText -notmatch "project\(ProjetoTrimado LANGUAGES CXX\)") {
+            throw "CMakeLists.txt nao recebeu o nome trimado 'ProjetoTrimado'"
+        }
+        return $true
+    }
+
+    Invoke-Test "Execucao no mesmo processo nao altera o diretorio atual (sem Set-Location)" {
+        $originalDir = (Get-Location).ProviderPath
+        Push-Location -LiteralPath $tempRoot
+        try {
+            $beforeInTemp = (Get-Location).ProviderPath
+            & $TargetScript "ProjetoInProcess" -Quiet *> $null
+            $afterInTemp = (Get-Location).ProviderPath
+
+            if ($afterInTemp -ne $beforeInTemp) {
+                throw "Diretorio atual foi alterado de '$beforeInTemp' para '$afterInTemp'"
+            }
+            if (-not (Test-Path -LiteralPath (Join-Path -Path $tempRoot -ChildPath "ProjetoInProcess\CMakeLists.txt"))) {
+                throw "ProjetoInProcess nao foi criado corretamente na execucao in-process"
+            }
+        }
+        finally {
+            Pop-Location
+        }
+
+        if ((Get-Location).ProviderPath -ne $originalDir) {
+            throw "Diretorio original da sessao nao foi preservado"
+        }
+        return $true
+    }
 
     $validProject = "ProjetoTesteSucesso"
-    $projectDir = Join-Path -Path $tempRoot -ChildPath $validProject
+    $projectDir   = Join-Path -Path $tempRoot -ChildPath $validProject
 
-    Run-Test "Criação de projeto válido encerra com código 0 e mensagem de sucesso" {
+    Invoke-Test "Criacao de projeto valido encerra com codigo 0 e instrucoes CMake corretas" {
         $res = Invoke-BootstrapIsolated -ScriptArguments @($validProject) -WorkingDirectory $tempRoot
         if ($res.ExitCode -ne 0) { throw "Esperado exit code 0, obtido $($res.ExitCode)" }
         if ($res.StdOut -notmatch "criado com sucesso") {
-            throw "Mensagem de sucesso não encontrada na saída"
+            throw "Mensagem de sucesso nao encontrada na saida"
+        }
+        if ($res.StdOut -notmatch "cmake -B build" -or $res.StdOut -notmatch "cmake --build build") {
+            throw "Instrucoes finais 'cmake -B build' / 'cmake --build build' ausentes"
         }
         return $true
     }
 
-    Run-Test "Diretórios obrigatórios gerados (src, include, .vscode)" {
+    Invoke-Test "Diretorios obrigatorios gerados (src, include, .vscode)" {
         $expectedDirs = @(
             $projectDir,
-            (Join-Path $projectDir "src"),
-            (Join-Path $projectDir "include"),
-            (Join-Path $projectDir ".vscode")
+            (Join-Path -Path $projectDir -ChildPath "src"),
+            (Join-Path -Path $projectDir -ChildPath "include"),
+            (Join-Path -Path $projectDir -ChildPath ".vscode")
         )
-        foreach ($d in $expectedDirs) {
-            if (-not (Test-Path -LiteralPath $d -PathType Container)) {
-                throw "Diretório obrigatório ausente: $d"
+        foreach ($dirPath in $expectedDirs) {
+            if (-not (Test-Path -LiteralPath $dirPath -PathType Container)) {
+                throw "Diretorio obrigatorio ausente: $dirPath"
             }
         }
         return $true
     }
 
-    Run-Test "Arquivo src/main.cpp criado com assinatura válida em C++" {
-        $mainCpp = Join-Path $projectDir "src/main.cpp"
+    Invoke-Test "Arquivo src/main.cpp criado com assinatura valida e locale portavel" {
+        $mainCpp = Join-Path -Path $projectDir -ChildPath "src/main.cpp"
         if (-not (Test-Path -LiteralPath $mainCpp -PathType Leaf)) {
-            throw "Arquivo src/main.cpp não foi criado"
+            throw "Arquivo src/main.cpp nao foi criado"
         }
-        $content = Get-Content -LiteralPath $mainCpp -Raw
-        if ($content -notmatch "int main\(\)") { throw "Assinatura 'int main()' não encontrada" }
-        if ($content -notmatch "#include <iostream>") { throw "Inclusão <iostream> não encontrada" }
-        if ($content -notmatch "std::setlocale") { throw "Chamada std::setlocale não encontrada" }
-        return $true
-    }
-
-    Run-Test "Configurações do VS Code criadas com sintaxe JSON válida" {
-        $launchJson = Join-Path $projectDir ".vscode/launch.json"
-        $settingsJson = Join-Path $projectDir ".vscode/settings.json"
-
-        if (-not (Test-Path -LiteralPath $launchJson)) { throw "launch.json ausente" }
-        if (-not (Test-Path -LiteralPath $settingsJson)) { throw "settings.json ausente" }
-
-        # Testa parsing JSON
-        $launchContent = Get-Content -LiteralPath $launchJson -Raw | ConvertFrom-Json
-        $settingsContent = Get-Content -LiteralPath $settingsJson -Raw | ConvertFrom-Json
-
-        if (-not $launchContent.configurations) { throw "launch.json não possui chave 'configurations'" }
-        if ($settingsContent.'cmake.exportCompileCommandsFile' -ne $true) {
-            throw "settings.json não habilitou 'cmake.exportCompileCommandsFile'"
+        $content = [System.IO.File]::ReadAllText($mainCpp)
+        if ($content -notmatch "int main\(\)") { throw "Assinatura 'int main()' nao encontrada" }
+        if ($content -notmatch "#include <iostream>") { throw "Inclusao <iostream> nao encontrada" }
+        if ($content -notmatch "#include <clocale>") { throw "Inclusao <clocale> nao encontrada" }
+        if ($content -notmatch 'std::setlocale\(LC_ALL,\s*""\)') {
+            throw 'Chamada portavel std::setlocale(LC_ALL, "") nao encontrada'
         }
         return $true
     }
 
-    Run-Test "CMakeLists.txt gerado com C++23 e substituição correta do nome do projeto" {
-        $cmakePath = Join-Path $projectDir "CMakeLists.txt"
+    Invoke-Test "Configuracoes do VS Code possuem sintaxe JSON valida e suporte multiplataforma" {
+        $launchJson   = Join-Path -Path $projectDir -ChildPath ".vscode/launch.json"
+        $settingsJson = Join-Path -Path $projectDir -ChildPath ".vscode/settings.json"
+
+        if (-not (Test-Path -LiteralPath $launchJson -PathType Leaf)) { throw "launch.json ausente" }
+        if (-not (Test-Path -LiteralPath $settingsJson -PathType Leaf)) { throw "settings.json ausente" }
+
+        $launchObj   = [System.IO.File]::ReadAllText($launchJson) | ConvertFrom-Json
+        $settingsObj = [System.IO.File]::ReadAllText($settingsJson) | ConvertFrom-Json
+
+        if (-not $launchObj.configurations -or $launchObj.configurations.Count -lt 1) {
+            throw "launch.json nao possui configuracoes"
+        }
+        $cfg = $launchObj.configurations[0]
+        if ($null -eq $cfg.windows -or $null -eq $cfg.linux -or $null -eq $cfg.osx) {
+            throw "launch.json nao contem blocos multiplataforma (windows, linux, osx)"
+        }
+        if ($settingsObj."cmake.exportCompileCommandsFile" -ne $true) {
+            throw "settings.json nao habilitou cmake.exportCompileCommandsFile"
+        }
+        $queryDriver = @($settingsObj."clangd.arguments" | Where-Object { $_ -like "--query-driver=*" })
+        if ($queryDriver.Count -eq 0 -or $queryDriver[0] -notmatch "/usr/bin/") {
+            throw "settings.json nao configurou --query-driver multiplataforma"
+        }
+        return $true
+    }
+
+    Invoke-Test "CMakeLists.txt gerado com C++23 estrito, guarda de CMAKE_BUILD_TYPE e flags rigorosas" {
+        $cmakePath = Join-Path -Path $projectDir -ChildPath "CMakeLists.txt"
         if (-not (Test-Path -LiteralPath $cmakePath -PathType Leaf)) {
-            throw "CMakeLists.txt não encontrado"
+            throw "CMakeLists.txt nao encontrado"
         }
-        $cmakeContent = Get-Content -LiteralPath $cmakePath -Raw
+        $cmakeContent = [System.IO.File]::ReadAllText($cmakePath)
 
-        # Valida substituição de template
         if ($cmakeContent -match "__PROJECT_NAME__") {
-            throw "Placeholder __PROJECT_NAME__ não foi substituído no CMakeLists.txt"
+            throw "Placeholder __PROJECT_NAME__ nao foi substituido"
         }
         if ($cmakeContent -notmatch "project\($validProject LANGUAGES CXX\)") {
-            throw "Declaração project($validProject LANGUAGES CXX) não encontrada"
+            throw "Declaracao project($validProject LANGUAGES CXX) ausente"
         }
         if ($cmakeContent -notmatch "set\(CMAKE_CXX_STANDARD 23\)") {
-            throw "Padrão C++23 não configurado"
+            throw "Padrao C++23 nao configurado"
         }
         if ($cmakeContent -notmatch "set\(CMAKE_CXX_STANDARD_REQUIRED ON\)") {
-            throw "Requisito estrito C++23 não ativado"
+            throw "Requisito estrito C++23 nao ativado"
         }
-        if ($cmakeContent -notmatch "-pedantic-errors") {
-            throw "Flags de compilação esperadas ausentes"
+        if ($cmakeContent -notmatch "if\(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES\)") {
+            throw "Guarda nao-destrutiva de CMAKE_BUILD_TYPE ausente"
+        }
+        if ($cmakeContent -notmatch "-pedantic-errors" -or $cmakeContent -notmatch "/permissive-") {
+            throw "Flags rigorosas de compilacao (GCC/Clang e MSVC) ausentes"
         }
         return $true
     }
 
-    Run-Test "Arquivo .gitignore criado com padrões essenciais de build" {
-        $gitIgnorePath = Join-Path $projectDir ".gitignore"
+    Invoke-Test "Arquivo .gitignore ignora artefatos de build e preserva launch.json e settings.json" {
+        $gitIgnorePath = Join-Path -Path $projectDir -ChildPath ".gitignore"
         if (-not (Test-Path -LiteralPath $gitIgnorePath -PathType Leaf)) {
-            throw ".gitignore não encontrado"
+            throw ".gitignore nao encontrado"
         }
-        $gitIgnoreContent = Get-Content -LiteralPath $gitIgnorePath -Raw
-        if ($gitIgnoreContent -notmatch "build/") { throw "Padrão build/ não encontrado em .gitignore" }
-        if ($gitIgnoreContent -notmatch "\*\.exe") { throw "Padrão *.exe não encontrado em .gitignore" }
+        $gitIgnoreContent = [System.IO.File]::ReadAllText($gitIgnorePath)
+        if ($gitIgnoreContent -notmatch "build/") { throw "Padrao build/ ausente em .gitignore" }
+        if ($gitIgnoreContent -notmatch "\*\.exe") { throw "Padrao *.exe ausente em .gitignore" }
+        if ($gitIgnoreContent -notmatch "\.vscode/\*") { throw "Padrao .vscode/* ausente em .gitignore" }
+        if ($gitIgnoreContent -notmatch "!\.vscode/launch\.json" -or $gitIgnoreContent -notmatch "!\.vscode/settings\.json") {
+            throw ".gitignore nao preservou !.vscode/launch.json e !.vscode/settings.json"
+        }
+        return $true
+    }
+
+    Invoke-Test "Todos os arquivos gerados estao estritamente em UTF-8 sem BOM e LF" {
+        $generatedFiles = @(
+            "CMakeLists.txt",
+            ".gitignore",
+            "src/main.cpp",
+            ".vscode/launch.json",
+            ".vscode/settings.json"
+        )
+        foreach ($rel in $generatedFiles) {
+            $fullPath = Join-Path -Path $projectDir -ChildPath $rel
+            if (Test-HasUtf8Bom -Path $fullPath) {
+                throw "BOM UTF-8 detectado no arquivo gerado: $rel"
+            }
+            $rawText = [System.IO.File]::ReadAllText($fullPath)
+            if ($rawText.Contains("`r`n")) {
+                throw "CRLF detectado no arquivo gerado (esperado LF padronizado): $rel"
+            }
+        }
         return $true
     }
 
     # --------------------------------------------------------------------------
-    # 4. Teste de Integração Real: Compilação com CMake e GCC (Opcional ou via Switch)
+    # 4. Compatibilidade Cruzada de Interpretadores e Compilacao Real CMake
     # --------------------------------------------------------------------------
-    Write-Header "4. Integração e Compilação Real com CMake"
+    Write-SectionHeader "4. Compatibilidade Windows PowerShell 5.1 e Integracao CMake"
 
-    $hasCmake = (Get-Command "cmake" -ErrorAction SilentlyContinue) -ne $null
-    $hasGcc = (Get-Command "g++" -ErrorAction SilentlyContinue) -ne $null
+    $winPs51Cmd = if ($isWin) { Get-Command "powershell.exe" -ErrorAction SilentlyContinue } else { $null }
+    if ($isWin -and ($null -ne $winPs51Cmd)) {
+        Invoke-Test "Execucao real no Windows PowerShell 5.1 funciona sem erro de parsing nem BOM" {
+            $ps51Project = "ProjetoWinPS51"
+            $res = Invoke-BootstrapIsolated -ScriptArguments @($ps51Project) -WorkingDirectory $tempRoot -ShellExecutable $winPs51Cmd.Source
+            if ($res.ExitCode -ne 0) {
+                throw "Windows PowerShell 5.1 falhou com exit code $($res.ExitCode). StdErr: $($res.StdErr)"
+            }
+            if ($res.StdOut -match '(^|[^A-Za-z])e\[\d+m') {
+                throw "Vazamento de sequencia ANSI literal 'e[...m' detectado no Windows PowerShell 5.1"
+            }
+
+            $ps51Dir = Join-Path -Path $tempRoot -ChildPath $ps51Project
+            foreach ($rel in @("CMakeLists.txt", ".gitignore", "src/main.cpp", ".vscode/launch.json", ".vscode/settings.json")) {
+                if (Test-HasUtf8Bom -Path (Join-Path -Path $ps51Dir -ChildPath $rel)) {
+                    throw "Windows PowerShell 5.1 gravou BOM UTF-8 em $rel"
+                }
+            }
+            return $true
+        }
+    }
+    else {
+        Invoke-Skip "Execucao real no Windows PowerShell 5.1" "Disponivel apenas no Windows"
+    }
+
+    $hasCmake    = $null -ne (Get-Command "cmake" -ErrorAction SilentlyContinue)
+    $hasCompiler = ($null -ne (Get-Command "g++" -ErrorAction SilentlyContinue)) -or
+                   ($null -ne (Get-Command "clang++" -ErrorAction SilentlyContinue)) -or
+                   ($null -ne (Get-Command "cl" -ErrorAction SilentlyContinue))
 
     if ($IncludeBuild) {
-        if (-not $hasCmake -or -not $hasGcc) {
-            Run-Skip "Compilação real com CMake e C++23" "CMake ou g++ não estão no PATH"
-        } else {
-            Run-Test "Projeto gerado configura e compila com sucesso via CMake (C++23)" {
-                # Configura build
-                $cmakeConfig = Start-Process -FilePath "cmake" -ArgumentList "-B", "build", "-G", "`"MinGW Makefiles`"" -WorkingDirectory $projectDir -NoNewWindow -Wait -PassThru
-                if ($cmakeConfig.ExitCode -ne 0) {
-                    # Tenta com gerador padrão caso MinGW Makefiles não seja suportado diretamente
-                    $cmakeConfig = Start-Process -FilePath "cmake" -ArgumentList "-B", "build" -WorkingDirectory $projectDir -NoNewWindow -Wait -PassThru
-                }
-                if ($cmakeConfig.ExitCode -ne 0) {
-                    throw "cmake -B build falhou com exit code $($cmakeConfig.ExitCode)"
-                }
+        if (-not $hasCmake -or -not $hasCompiler) {
+            Invoke-Skip "Compilacao real com CMake e C++23" "CMake ou compilador C++ (g++, clang++, cl) ausente no PATH"
+        }
+        else {
+            Invoke-Test "Projeto gerado configura (respeitando CMAKE_BUILD_TYPE) e compila em C++23" {
+                $buildDir = Join-Path -Path $projectDir -ChildPath "build"
+                $configured = $false
 
-                # Compila
-                $cmakeBuild = Start-Process -FilePath "cmake" -ArgumentList "--build", "build" -WorkingDirectory $projectDir -NoNewWindow -Wait -PassThru
-                if ($cmakeBuild.ExitCode -ne 0) {
-                    throw "cmake --build build falhou com exit code $($cmakeBuild.ExitCode)"
-                }
+                # No Windows com g++ e mingw32-make/make, tenta MinGW Makefiles primeiro
+                $hasMake = ($null -ne (Get-Command "mingw32-make" -ErrorAction SilentlyContinue)) -or
+                           ($null -ne (Get-Command "make" -ErrorAction SilentlyContinue))
 
-                # Verifica binário gerado
-                $binName = if ($IsWindows -or $PSVersionTable.Platform -eq "Win32NT") { "$validProject.exe" } else { $validProject }
-                $binPath = Join-Path $projectDir "build/$binName"
-                if (-not (Test-Path -LiteralPath $binPath)) {
-                    # Em geradores multi-config (ex: Visual Studio / Ninja Multi-Config)
-                    $binPathDebug = Join-Path $projectDir "build/Debug/$binName"
-                    if (-not (Test-Path -LiteralPath $binPathDebug)) {
-                        throw "Binário final não foi gerado em $binPath nem em $binPathDebug"
+                if ($isWin -and $hasMake -and ($null -ne (Get-Command "g++" -ErrorAction SilentlyContinue))) {
+                    $cfgMinGW = Invoke-ExternalProcess -FilePath "cmake" -ArgumentList @("-B", "build", "-G", "MinGW Makefiles", "-DCMAKE_BUILD_TYPE=Release") -WorkingDirectory $projectDir
+                    if ($cfgMinGW.ExitCode -eq 0) {
+                        $configured = $true
+                    }
+                    elseif (Test-Path -LiteralPath $buildDir) {
+                        # Limpa CMakeCache.txt parcial antes do fallback para evitar generator mismatch
+                        Remove-Item -LiteralPath $buildDir -Recurse -Force
                     }
                 }
+
+                if (-not $configured) {
+                    $cfgDefault = Invoke-ExternalProcess -FilePath "cmake" -ArgumentList @("-B", "build", "-DCMAKE_BUILD_TYPE=Release") -WorkingDirectory $projectDir
+                    if ($cfgDefault.ExitCode -ne 0) {
+                        throw "cmake -B build falhou (exit $($cfgDefault.ExitCode)): $($cfgDefault.StdErr)"
+                    }
+                }
+
+                # Verifica se -DCMAKE_BUILD_TYPE=Release nao foi sobrescrito por Debug em geradores single-config
+                $cachePath = Join-Path -Path $buildDir -ChildPath "CMakeCache.txt"
+                if (Test-Path -LiteralPath $cachePath -PathType Leaf) {
+                    $cacheText = [System.IO.File]::ReadAllText($cachePath)
+                    if ($cacheText -notmatch "CMAKE_CONFIGURATION_TYPES" -and $cacheText -notmatch "CMAKE_BUILD_TYPE:STRING=Release") {
+                        throw "CMakeLists.txt sobrescreveu -DCMAKE_BUILD_TYPE=Release indevidamente"
+                    }
+                }
+
+                $buildRes = Invoke-ExternalProcess -FilePath "cmake" -ArgumentList @("--build", "build", "--config", "Release") -WorkingDirectory $projectDir
+                if ($buildRes.ExitCode -ne 0) {
+                    throw "cmake --build build falhou (exit $($buildRes.ExitCode)): $($buildRes.StdErr)"
+                }
+
+                $binName = if ($isWin) { "$validProject.exe" } else { $validProject }
+                $candidates = @(
+                    (Join-Path -Path $buildDir -ChildPath $binName),
+                    (Join-Path -Path $buildDir -ChildPath "Release/$binName"),
+                    (Join-Path -Path $buildDir -ChildPath "Debug/$binName")
+                )
+                $foundBin = @($candidates | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf })
+                if ($foundBin.Count -eq 0) {
+                    throw "Binario compilado nao encontrado em: $($candidates -join ', ')"
+                }
+
                 return $true
             }
         }
-    } else {
-        Run-Skip "Compilação real com CMake e C++23" "Passe o parâmetro -IncludeBuild para rodar este teste"
     }
-
+    else {
+        Invoke-Skip "Compilacao real com CMake e C++23" "Passe -IncludeBuild para executar este teste"
+    }
 }
 finally {
     $startTime.Stop()
 
-    # Limpeza segura da pasta temporária
     if (Test-Path -LiteralPath $tempRoot) {
         try {
             Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
-        } catch {
-            # Se algum processo manteve lock temporário, ignora erro no cleanup
+        }
+        catch {
+            # Ignora lock transitorio no cleanup do diretorio temporario
         }
     }
 }
 
-# ------------------------------------------------------------------------------
-# Resumo da Execucao
-# ------------------------------------------------------------------------------
+#=========================== [ RESUMO DA EXECUCAO ] ============================
+
 Write-Host ""
-Write-Host "$GRAY━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━$RESET"
+Write-Host $divider
 Write-Host "$BOLD[RESUMO DA EXECUCAO DOS TESTES]$RESET"
-Write-Host "$GRAY━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━$RESET"
+Write-Host $divider
 Write-Host "  Total de testes : $script:TotalTests"
-Write-Host "  $GREEN Aprovados        : $script:PassedTests$RESET"
+Write-Host "  $GREEN Aprovados       : $script:PassedTests$RESET"
 if ($script:FailedTests -gt 0) {
-    Write-Host "  $RED Falhos           : $script:FailedTests$RESET"
-} else {
-    Write-Host "  $GRAY Falhos           : 0$RESET"
+    Write-Host "  $RED Falhos          : $script:FailedTests$RESET"
+}
+else {
+    Write-Host "  $GRAY Falhos          : 0$RESET"
 }
 if ($script:SkippedTests -gt 0) {
-    Write-Host "  $YELLOW Ignorados        : $script:SkippedTests$RESET"
+    Write-Host "  $YELLOW Ignorados       : $script:SkippedTests$RESET"
 }
 Write-Host "  Tempo total     : $($startTime.Elapsed.TotalSeconds.ToString('F2'))s"
-Write-Host "$GRAY━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━$RESET"
+Write-Host $divider
 Write-Host ""
 
 if ($script:FailedTests -gt 0) {
     Write-Host "$RED[FAIL] A suite de testes falhou!$RESET"
     exit 1
-} else {
+}
+else {
     Write-Host "$GREEN[PASS] Todos os testes passaram com sucesso!$RESET"
     exit 0
 }
