@@ -1,0 +1,105 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-binaries:
+    name: Build (${{ matrix.target }})
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: windows-x64
+            os: windows-latest
+            archive_ext: zip
+          - target: linux-x64
+            os: ubuntu-24.04
+            archive_ext: tar.gz
+          - target: macos-arm64
+            os: macos-15
+            archive_ext: tar.gz
+
+    steps:
+      - name: Checkout do repositorio
+        uses: actions/checkout@v4
+
+      - name: Instalar GCC 14 (Ubuntu)
+        if: matrix.os == 'ubuntu-24.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y g++-14
+
+      - name: Compilar e testar (Windows MSVC)
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          cmake -B build -DCMAKE_BUILD_TYPE=Release
+          cmake --build build --config Release
+          ctest --test-dir build -C Release --output-on-failure
+          New-Item -ItemType Directory -Path dist -Force | Out-Null
+          Copy-Item build/Release/cpp-bootstrap.exe dist/cpp-bootstrap.exe
+          Copy-Item README.md dist/README.md
+          $tag = if ($env:GITHUB_REF_TYPE -eq 'tag') { $env:GITHUB_REF_NAME } else { 'snapshot' }
+          Compress-Archive -Path dist/* -DestinationPath "cpp-bootstrap-$tag-${{ matrix.target }}.zip" -Force
+
+      - name: Compilar e testar (Linux x64)
+        if: matrix.os == 'ubuntu-24.04'
+        shell: bash
+        run: |
+          CXX=g++-14 cmake -B build -DCMAKE_BUILD_TYPE=Release
+          cmake --build build
+          ctest --test-dir build --output-on-failure
+          mkdir -p dist
+          cp build/cpp-bootstrap dist/cpp-bootstrap
+          cp README.md dist/README.md
+          TAG="${GITHUB_REF_NAME:-snapshot}"
+          if [ "$GITHUB_REF_TYPE" != "tag" ]; then TAG="snapshot"; fi
+          tar -czf "cpp-bootstrap-${TAG}-${{ matrix.target }}.tar.gz" -C dist .
+
+      - name: Compilar e testar (macOS arm64)
+        if: matrix.os == 'macos-15'
+        shell: bash
+        run: |
+          cmake -B build -DCMAKE_BUILD_TYPE=Release
+          cmake --build build
+          ctest --test-dir build --output-on-failure
+          mkdir -p dist
+          cp build/cpp-bootstrap dist/cpp-bootstrap
+          cp README.md dist/README.md
+          TAG="${GITHUB_REF_NAME:-snapshot}"
+          if [ "$GITHUB_REF_TYPE" != "tag" ]; then TAG="snapshot"; fi
+          tar -czf "cpp-bootstrap-${TAG}-${{ matrix.target }}.tar.gz" -C dist .
+
+      - name: Enviar artefato da plataforma
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.target }}
+          path: cpp-bootstrap-*.${{ matrix.archive_ext }}
+
+  publish-release:
+    name: Publicar GitHub Release
+    needs: build-binaries
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Baixar todos os pacotes compilados
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Publicar Release no GitHub
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/*
+          generate_release_notes: true

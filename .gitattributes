@@ -1,5 +1,8 @@
 # Padroniza fins de linha em LF para evitar divergencias entre Windows, Linux e macOS
 * text=auto eol=lf
-*.ps1 text eol=lf
+*.cpp text eol=lf
+*.hpp text eol=lf
+CMakeLists.txt text eol=lf
+*.yml text eol=lf
 *.md text eol=lf
 *.json text eol=lf

@@ -1,0 +1,86 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build-and-test:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Ubuntu 24.04 (GCC 14)
+            os: ubuntu-24.04
+            kind: linux-gcc
+          - name: Windows (MSVC)
+            os: windows-latest
+            kind: win-msvc
+          - name: Windows (MSYS2 UCRT64 GCC)
+            os: windows-latest
+            kind: win-msys2
+          - name: macOS 15 (Clang)
+            os: macos-15
+            kind: macos-clang
+
+    steps:
+      - name: Checkout do repositorio
+        uses: actions/checkout@v4
+
+      - name: Instalar GCC 14 (Ubuntu)
+        if: matrix.kind == 'linux-gcc'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y g++-14
+
+      - name: Configurar MSYS2 UCRT64 (Windows MinGW)
+        if: matrix.kind == 'win-msys2'
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: false
+          install: >-
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-cmake
+            mingw-w64-ucrt-x86_64-ninja
+            mingw-w64-ucrt-x86_64-make
+
+      - name: Configurar e compilar (Ubuntu / macOS / MSVC)
+        if: matrix.kind != 'win-msys2'
+        env:
+          CXX: ${{ matrix.kind == 'linux-gcc' && 'g++-14' || '' }}
+        run: |
+          cmake -B build -DCMAKE_BUILD_TYPE=Release
+          cmake --build build --config Release
+
+      - name: Configurar e compilar (Windows MSYS2)
+        if: matrix.kind == 'win-msys2'
+        shell: msys2 {0}
+        run: |
+          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCPP_BOOTSTRAP_STATIC_RUNTIME=ON
+          cmake --build build
+
+      - name: Executar CTest e integracao CMake (Ubuntu / macOS / MSVC)
+        if: matrix.kind != 'win-msys2'
+        shell: bash
+        run: |
+          ctest --test-dir build -C Release --output-on-failure
+          if [ -f "./build/Release/test_cpp_bootstrap.exe" ]; then
+            ./build/Release/test_cpp_bootstrap.exe --target-exe ./build/Release/cpp-bootstrap.exe --include-build
+          else
+            ./build/test_cpp_bootstrap --target-exe ./build/cpp-bootstrap --include-build
+          fi
+
+      - name: Executar CTest e integracao CMake (Windows MSYS2)
+        if: matrix.kind == 'win-msys2'
+        shell: msys2 {0}
+        run: |
+          ctest --test-dir build --output-on-failure
+          ./build/test_cpp_bootstrap.exe --target-exe ./build/cpp-bootstrap.exe --include-build
