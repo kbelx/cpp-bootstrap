@@ -1,20 +1,19 @@
 /*
 AUTOR: Bruno Costa
 DATA: 16/11/2026
-PROPOSITO: Templates embutidos em raw string literals e renderizacao literal do CMakeLists.txt.
-
+PROPOSITO: Templates embutidos em RAW STRING LITERALS e renderizacao literal do CMakeLists.txt
 */
 
-#pragma once
+#ifndef TEMPLATE_H
+#define TEMPLATE_H
 
-//============================ [ TEMPLATES EMBUTIDOS ] =========================
+    #include <string>
+    #include <string_view>
 
-#include <string>
-#include <string_view>
+    namespace bootstrap::tpl {
 
-namespace bootstrap::tpl {
-
-inline constexpr std::string_view kLaunchJson = R"tpl({
+    // Base para o arquivo ".vscode/launch.json"
+    inline constexpr std::string_view kLaunchJson = R"tpl({
     "version": "0.2.0",
     "configurations": [
         {
@@ -52,7 +51,9 @@ inline constexpr std::string_view kLaunchJson = R"tpl({
 }
 )tpl";
 
-inline constexpr std::string_view kSettingsJson = R"tpl({
+
+    // Base para o arquivo ".vscode/settings.json"
+    inline constexpr std::string_view kSettingsJson = R"tpl({
     "cmake.exportCompileCommandsFile": true,
     "C_Cpp.intelliSenseEngine": "disabled",
     "clangd.arguments": [
@@ -62,7 +63,9 @@ inline constexpr std::string_view kSettingsJson = R"tpl({
 }
 )tpl";
 
-inline constexpr std::string_view kMainCpp = R"tpl(/******************************************************************************
+
+    // Base para o arquivo "main.cpp"
+    inline constexpr std::string_view kMainCpp = R"tpl(/******************************************************************************
 AUTOR:        <SEU_NOME>
 DATA:         <DD/MM/AAAA>
 NOTAS:
@@ -80,7 +83,9 @@ int main() {
 }
 )tpl";
 
-inline constexpr std::string_view kCmakeLists = R"tpl(#===============================================================================
+
+    // Base para o arquivo "CMakeLists.txt" com essas configuracoes
+    inline constexpr std::string_view kCmakeLists = R"tpl(#===============================================================================
 # 1 - CONFIGURACAO MINIMA DO CMAKE
 # ------------------------------------------------------------------------------
 # Define a versao minima do CMake necessaria para gerar o projeto.
@@ -169,7 +174,9 @@ if(NOT MSVC AND NOT APPLE)
 endif()
 )tpl";
 
-inline constexpr std::string_view kGitignore = R"tpl(# Build e artefatos de compilacao
+
+    // Base para o arquivo ".gitignore"
+    inline constexpr std::string_view kGitignore = R"tpl(# Build e artefatos de compilacao
 build/
 cmake-build-*/
 out/
@@ -199,25 +206,28 @@ Makefile
 .idea/
 )tpl";
 
-// Substitui literalmente todas as ocorrencias de __PROJECT_NAME__ no template CMake.
-[[nodiscard]] inline std::string render_cmake_lists(std::string_view project_name) {
-    constexpr std::string_view kPlaceholder = "__PROJECT_NAME__";
-    std::string result;
-    result.reserve(kCmakeLists.size() + project_name.size());
 
-    std::size_t pos = 0;
-    while (pos < kCmakeLists.size()) {
-        const std::size_t found = kCmakeLists.find(kPlaceholder, pos);
-        if (found == std::string_view::npos) {
-            result.append(kCmakeLists.substr(pos));
-            break;
+    // Substitui literalmente todas as ocorrencias de __PROJECT_NAME__ no template CMake.
+    [[nodiscard]] inline std::string render_cmake_lists(std::string_view project_name) {
+        constexpr std::string_view kPlaceholder = "__PROJECT_NAME__";
+        std::string result;
+        result.reserve(kCmakeLists.size() + project_name.size());
+
+        std::size_t pos = 0;
+        while (pos < kCmakeLists.size()) {
+            const std::size_t found = kCmakeLists.find(kPlaceholder, pos);
+            if (found == std::string_view::npos) {
+                result.append(kCmakeLists.substr(pos));
+                break;
+            }
+            result.append(kCmakeLists.substr(pos, found - pos));
+            result.append(project_name);
+            pos = found + kPlaceholder.size();
         }
-        result.append(kCmakeLists.substr(pos, found - pos));
-        result.append(project_name);
-        pos = found + kPlaceholder.size();
+
+        return result;
     }
 
-    return result;
-}
+    }  // namespace bootstrap::tpl
 
-}  // namespace bootstrap::tpl
+#endif
