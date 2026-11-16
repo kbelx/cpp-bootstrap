@@ -1,3 +1,10 @@
+/*
+AUTOR: Bruno Costa
+DATA: 16/11/2026
+PROPOSITO: Declaracao da funcao de validacao multiplataforma de nomes de projeto.
+
+*/
+
 #pragma once
 
 //============================ [ VALIDACAO DO NOME ] ===========================

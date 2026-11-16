@@ -1,3 +1,10 @@
+/*
+AUTOR: Bruno Costa
+DATA: 16/11/2026
+PROPOSITO: Ponto de entrada da CLI cpp-bootstrap, orquestracao do fluxo e banner de sucesso.
+
+*/
+
 #include "cli.hpp"
 #include "generator.hpp"
 #include "terminal.hpp"
@@ -19,7 +26,7 @@ void print_success_banner(std::string_view project_name, bool quiet) {
     };
 
     bootstrap::term::print_line("");
-    bootstrap::term::print_separator();
+    bootstrap::term::print_separator(); 
     bootstrap::term::print_line(
         "[OK] Projeto " + wrap(p.green, "'" + std::string(project_name) + "'", p.reset) + " criado com sucesso!"
     );

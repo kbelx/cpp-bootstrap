@@ -1,3 +1,10 @@
+/*
+AUTOR: Bruno Costa
+DATA: 16/11/2026
+PROPOSITO: Templates embutidos em raw string literals e renderizacao literal do CMakeLists.txt.
+
+*/
+
 #pragma once
 
 //============================ [ TEMPLATES EMBUTIDOS ] =========================

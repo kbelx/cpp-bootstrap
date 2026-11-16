@@ -1,3 +1,10 @@
+/*
+AUTOR: Bruno Costa
+DATA: 16/11/2026
+PROPOSITO: Declaracoes de opcoes da CLI, normalizacao de nome e exibicao de ajuda/versao.
+
+*/
+
 #pragma once
 
 //============================ [ CLI / PARSE ] =================================

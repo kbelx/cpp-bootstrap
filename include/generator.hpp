@@ -1,3 +1,10 @@
+/*
+AUTOR: Bruno Costa
+DATA: 16/11/2026
+PROPOSITO: Declaracao do rollback RAII (DirectoryRollbackGuard), escrita UTF-8 sem BOM e geracao do projeto.
+
+*/
+
 #pragma once
 
 //============================ [ CRIACAO DO PROJETO ] ==========================

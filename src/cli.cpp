@@ -1,3 +1,10 @@
+/*
+AUTOR: Bruno Costa
+DATA: 16/11/2026
+PROPOSITO: Implementacao do parser de linha de comando, trim do nome e telas de tutorial/ajuda.
+
+*/
+
 #include "cli.hpp"
 
 #include "terminal.hpp"

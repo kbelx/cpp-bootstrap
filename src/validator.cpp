@@ -1,3 +1,10 @@
+/*
+AUTOR: Bruno Costa
+DATA: 16/11/2026
+PROPOSITO: Validacao de nomes em 5 regras (vazio, ponto final, reservados, CMake e colisao).
+
+*/
+
 #include "validator.hpp"
 
 #include "terminal.hpp"

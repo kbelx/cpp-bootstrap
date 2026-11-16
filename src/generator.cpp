@@ -1,3 +1,10 @@
+/*
+AUTOR: Bruno Costa
+DATA: 16/11/2026
+PROPOSITO: Criacao transacional da estrutura do projeto com gravacao em UTF-8 sem BOM e LF.
+
+*/
+
 #include "generator.hpp"
 
 #include "templates.hpp"

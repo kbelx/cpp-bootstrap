@@ -1,3 +1,10 @@
+/*
+AUTOR: Bruno Costa
+DATA: 16/11/2026
+PROPOSITO: Suite automatizada de testes unitarios e de integracao C++23 integrada ao CTest.
+
+*/
+
 #include "cli.hpp"
 #include "generator.hpp"
 #include "terminal.hpp"

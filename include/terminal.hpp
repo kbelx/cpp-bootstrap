@@ -1,3 +1,10 @@
+/*
+AUTOR: Bruno Costa
+DATA: 16/11/2026
+PROPOSITO: Deteccao de SO, suporte ANSI/VT e utilitarios de saida formatada no terminal.
+
+*/
+
 #pragma once
 
 //============================ [ DETECCAO DE AMBIENTE ] ========================
