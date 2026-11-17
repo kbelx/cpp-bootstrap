@@ -4,16 +4,20 @@ DATA: 16/11/2026
 PROPOSITO: Templates embutidos em RAW STRING LITERALS e renderizacao literal do CMakeLists.txt
 */
 
-#ifndef TEMPLATE_H
-#define TEMPLATE_H
+#ifndef TEMPLATES_HPP
+#define TEMPLATES_HPP
+
+//============================ [ CABECALHOS PADRAO ] ===========================
 
 #include <string>
 #include <string_view>
 
-namespace Templates {
+//======================== [ TEMPLATES DO VS CODE ] ============================
 
-// Base para o arquivo ".vscode/launch.json"
-inline constexpr std::string_view kLaunchJson = R"tpl({
+namespace Templates::VSCode {
+
+    // Base para o arquivo ".vscode/launch.json"
+    inline constexpr std::string_view LAUNCH_JSON{R"tpl({
     "version": "0.2.0",
     "configurations": [
         {
@@ -49,11 +53,10 @@ inline constexpr std::string_view kLaunchJson = R"tpl({
         }
     ]
 }
-)tpl";
+)tpl"};
 
-
-// Base para o arquivo ".vscode/settings.json"
-inline constexpr std::string_view kSettingsJson = R"tpl({
+    // Base para o arquivo ".vscode/settings.json"
+    inline constexpr std::string_view SETTINGS_JSON{R"tpl({
     "cmake.exportCompileCommandsFile": true,
     "C_Cpp.intelliSenseEngine": "disabled",
     "clangd.arguments": [
@@ -61,11 +64,16 @@ inline constexpr std::string_view kSettingsJson = R"tpl({
         "--query-driver=C:/msys64/*/bin/*g++.exe,/usr/bin/*g++*,/usr/bin/*clang++*,/usr/local/bin/*,/opt/homebrew/bin/*"
     ]
 }
-)tpl";
+)tpl"};
 
+}  // namespace Templates::VSCode
 
-// Base para o arquivo "main.cpp"
-inline constexpr std::string_view kMainCpp = R"tpl(
+//======================== [ TEMPLATES DO PROJETO ] ============================
+
+namespace Templates::Projeto {
+
+    // Base para o arquivo "src/main.cpp"
+    inline constexpr std::string_view MAIN_CPP{R"tpl(
 /*******************************************************************************
 AUTOR:        <SEU_NOME>
 DATA:         <DD/MM/AAAA>
@@ -84,11 +92,10 @@ int main() {
     std::cin.ignore();
     return 0;
 }
-)tpl";
+)tpl"};
 
-
-// Base para o arquivo "CMakeLists.txt" com essas configuracoes
-inline constexpr std::string_view kCmakeLists = R"tpl(
+    // Base para o arquivo "CMakeLists.txt"
+    inline constexpr std::string_view CMAKE_LISTS{R"tpl(
 #===============================================================================
 # 1 - CONFIGURACAO MINIMA DO CMAKE
 # ------------------------------------------------------------------------------
@@ -176,11 +183,10 @@ if(NOT MSVC AND NOT APPLE)
         target_link_libraries(${PROJECT_NAME} PRIVATE stdc++exp)
     endif()
 endif()
-)tpl";
+)tpl"};
 
-
-// Base para o arquivo ".gitignore"
-inline constexpr std::string_view kGitignore = R"tpl(
+    // Base para o arquivo ".gitignore"
+    inline constexpr std::string_view GITIGNORE{R"tpl(
 # Build e artefatos de compilacao
 build/
 cmake-build-*/
@@ -209,30 +215,36 @@ Makefile
 !.vscode/launch.json
 !.vscode/settings.json
 .idea/
-)tpl";
+)tpl"};
 
+}  // namespace Templates::Projeto
 
-// Substitui literalmente todas as ocorrencias de __PROJECT_NAME__ no template CMake.
-[[nodiscard]] inline std::string render_cmake_lists(std::string_view project_name) {
-    constexpr std::string_view kPlaceholder = "__PROJECT_NAME__";
-    std::string result;
-        result.reserve(kCmakeLists.size() + project_name.size());
+//======================= [ RENDERIZACAO DE TEMPLATES ] ========================
 
-    std::size_t pos = 0;
-    while (pos < kCmakeLists.size()) {
-        const std::size_t found = kCmakeLists.find(kPlaceholder, pos);
-        if (found == std::string_view::npos) {
-            result.append(kCmakeLists.substr(pos));
-            break;
+namespace Templates::Render {
+
+    inline constexpr std::string_view MARCADOR_PROJETO{"__PROJECT_NAME__"};
+
+    // Substitui literalmente todas as ocorrencias de __PROJECT_NAME__ no template CMake.
+    [[nodiscard]] inline std::string renderizarCMake(std::string_view NomeProjeto) {
+        std::string Resultado{};
+        Resultado.reserve(Projeto::CMAKE_LISTS.size() + NomeProjeto.size());
+
+        std::size_t Pos{0};
+        while (Pos < Projeto::CMAKE_LISTS.size()) {
+            const std::size_t ENCONTRADO{Projeto::CMAKE_LISTS.find(MARCADOR_PROJETO, Pos)};
+            if (ENCONTRADO == std::string_view::npos) {
+                Resultado.append(Projeto::CMAKE_LISTS.substr(Pos));
+                break;
+            }
+            Resultado.append(Projeto::CMAKE_LISTS.substr(Pos, ENCONTRADO - Pos));
+            Resultado.append(NomeProjeto);
+            Pos = ENCONTRADO + MARCADOR_PROJETO.size();
         }
-        result.append(kCmakeLists.substr(pos, found - pos));
-        result.append(project_name);
-            pos = found + kPlaceholder.size();
+
+        return Resultado;
     }
 
-    return result;
-    }
-
-    }  // namespace bootstrap::tpl
+}  // namespace Templates::Render
 
 #endif
