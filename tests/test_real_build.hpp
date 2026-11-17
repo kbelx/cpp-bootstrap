@@ -27,7 +27,7 @@ namespace Testes::BuildReal {
 
     inline void configurarProjetoCMake(
         const std::filesystem::path& DirProjeto,
-        const std::filesystem::path& DirBuild
+        [[maybe_unused]] const std::filesystem::path& DirBuild
     ) {
         bool Configurado{false};
 
