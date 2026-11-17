@@ -1,38 +1,27 @@
 # C++ Bootstrap
 
-Ferramenta CLI nativa e multiplataforma escrita em **C++23** para inicialização rápida de projetos **C++23** com **CMake**, estrutura de diretórios padronizada, rollback transacional (RAII) e ambiente pronto para desenvolvimento e depuração no **Visual Studio Code** (Windows, Linux e macOS).
+Ferramenta CLI nativa em **C++23** para criar projetos **C++23 + CMake** com estrutura padronizada, rollback transacional (RAII) e suporte pronto ao **VS Code** (Windows, Linux e macOS).
 
-> **Observação:** 
-> - O protótipo original em PowerShell encontra-se congelado na tag [`v0.9.0-beta`](../../tree/v0.9.0-beta) e no branch `legacy/powershell-beta`. 
-> - A partir da **`v1.0.0`**, o projeto é distribuído como executável nativo em C++23 sem dependências de runtime externas.
+> - Protótipo legado em PowerShell congelado na tag [`v0.9.0-beta`](../../tree/v0.9.0-beta) (`legacy/powershell-beta`).
+> - A partir da **`v1.0.0`**, o binário é nativo em C++23 sem dependências de runtime externas.
 
-
-| Info                                     | Descrição                                             |
-| ---------------------------------------- | ----------------------------------------------------- |
-| Autoria                                  | Bruno Costa ([@kbelx](https://github.com/kbelx))      |
-| Padrão                                   | C++23 estrito (`set(CMAKE_CXX_STANDARD_REQUIRED ON)`) |
-| Build System                             | CMake ( _mínimo 3.20_ )                               |
-| Compilador / Debugger Alvo dos Templates | - **Windows:** GCC (`g++`) e GDB via MSYS2 (UCRT64) ou MSVC<br><br>  - **Linux:** GCC / Clang e GDB (`/usr/bin/gdb`)<br><br>  - **macOS:** Clang / GCC e LLDB (`lldb`) |
-
+| Info | Descrição |
+| :--- | :--- |
+| Autoria | Bruno Costa ([@kbelx](https://github.com/kbelx)) |
+| Padrão | C++23 estrito (`CMAKE_CXX_STANDARD_REQUIRED ON`) |
+| Build System | CMake (`>= 3.20`) |
+| Alvos dos Templates | **Windows:** GCC/GDB (MSYS2 UCRT64) ou MSVC • **Linux:** GCC/Clang + GDB • **macOS:** Clang/GCC + LLDB |
 
 ---
 
 ## 1. Instalação e Compilação
 
-### Opção A - DOWNLOAD BINÁRIO PRONTO (GitHub Releases)
-1. Acesse a aba **Releases** do repositório e baixe o pacote pré-compilado para o seu sistema (`windows-x64.zip`, `linux-x64.tar.gz` ou `macos-arm64.tar.gz`). 
-2. Basta extrair o executável `cpp-bootstrap` para uma pasta no seu `PATH`.
+### Opção A — Binário Pronto (GitHub Releases)
+Baixe o pacote da sua plataforma na aba **Releases** (`windows-x64.zip`, `linux-x64.tar.gz` ou `macos-arm64.tar.gz`) e extraia o executável `cpp-bootstrap` para uma pasta no seu `PATH`.
 
-### Opção B - COMPILAR A PARTIR DO CÓDIGO-FONTE
+### Opção B — Compilar do Código-Fonte
+**Pré-requisitos:** CMake `>= 3.20` e compilador C++23 (GCC 14+, Clang 18+ ou Visual Studio 2022+).
 
-#### Pré-requisitos
-1. **CMake** 3.20 ou superior.
-2. **Compilador C++23**:
-   - **Windows:** MSYS2 UCRT64 (`g++` 14+ / `clang++` 18+) ou Visual Studio 2022+ (MSVC).
-   - **Linux:** GCC 14+ ou Clang 18+.
-   - **macOS:** Xcode Command Line Tools (Clang) ou Homebrew GCC/LLVM.
-
-#### Build Local
 ```powershell
 # Windows (MSYS2 UCRT64 / MinGW)
 cmake -B build -G "MinGW Makefiles" -DCMAKE_BUILD_TYPE=Release
@@ -43,40 +32,34 @@ cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build --config Release
 ```
 
-*(Para gerar um executável standalone no MinGW sem dependência das DLLs do MSYS2, adicione `-DCPP_BOOTSTRAP_STATIC_RUNTIME=ON` na etapa de configuração.)*
+*(Adicione `-DCPP_BOOTSTRAP_STATIC_RUNTIME=ON` no MinGW para gerar binário standalone sem DLLs do MSYS2.)*
 
 ---
 
-## 2. Como Usar
+## 2. Uso e Validações
 
 ```powershell
-# Criar um novo projeto no diretorio atual
-cpp-bootstrap MeuProjeto
-
-# Modo enxuto (suprime o rodape de autoria e links)
-cpp-bootstrap MeuProjeto -q
-cpp-bootstrap MeuProjeto --quiet
-
-# Ajuda e versao
-cpp-bootstrap --help
-cpp-bootstrap --version
+cpp-bootstrap MeuProjeto         # Cria o projeto no diretorio atual
+cpp-bootstrap MeuProjeto -q      # Suprime o rodape de autoria e links (--quiet)
+cpp-bootstrap --help             # Exibe ajuda
+cpp-bootstrap --version          # Exibe versao
 ```
 
-### Validações de Nome e Segurança Embutidas
-Antes de criar qualquer arquivo no disco, o `cpp-bootstrap` normaliza espaços e aspas externas uma única vez e aplica regras uniformes entre Windows, Linux e macOS:
-1. Rejeita nomes vazios ou compostos apenas por espaços (`exit 2`).
-2. Rejeita nomes terminados com ponto final `.` para manter compatibilidade entre sistemas de arquivos via Git (`exit 2`).
-3. Impede o uso de nomes de dispositivos reservados do Windows (`CON`, `PRN`, `AUX`, `NUL`, `COM1-9`, `LPT1-9`) (`exit 2`).
-4. Aceita exclusivamente caracteres seguros para CMake e filesystems multiplataforma (`^[A-Za-z0-9_][A-Za-z0-9_-]*$`), bloqueando espaços internos (`"Meu Projeto"`), múltiplos tokens sem aspas, caracteres especiais (`\ / : * ? " < > |`) e início com `-` (`exit 2`).
-5. Impede a sobrescrita se uma pasta ou arquivo com o mesmo nome já existir (`exit 2`).
-6. Garante integridade transacional via **RAII (`DirectoryRollbackGuard`)**: em caso de falha inesperada de I/O, a pasta criada pela metade é removida automaticamente (`exit 10`).
+Antes de gravar no disco, o nome sofre trim único de espaços/aspas externas e passa por 5 regras (`exit 2` se inválido):
+1. Não vazio e não composto apenas por espaços.
+2. Não termina com `.`.
+3. Não usa nomes reservados do Windows (`CON`, `PRN`, `AUX`, `NUL`, `COM1..9`, `LPT1..9`).
+4. Aceita apenas `^[A-Za-z0-9_][A-Za-z0-9_-]*$` (sem espaços internos ou `-` inicial).
+5. Não colide com pasta ou arquivo existente.
+
+Falhas de I/O acionam rollback automático via **RAII (`DirectoryRollbackGuard`)** removendo a pasta parcial (`exit 10`).
 
 ---
 
-## 3. Estrutura Gerada e Arquitetura do Projeto
+## 3. Estrutura Gerada e Arquitetura
 
-### 4.1. Estrutura Gerada para Novos Projetos
-Todos os arquivos gerados saem estritamente em **UTF-8 sem BOM** com quebras de linha **LF**:
+### 3.1. Estrutura Gerada para Novos Projetos
+Todos os arquivos saem em **UTF-8 sem BOM** e **LF**:
 
 ```text
 MeuProjeto/
@@ -90,35 +73,41 @@ MeuProjeto/
 └── .gitignore
 ```
 
-| Arquivo | Descrição |
+| Arquivo | Função |
 | :--- | :--- |
-| `src/main.cpp` | Código de partida com locale portável do ambiente (`std::setlocale(LC_ALL, "")`), cabeçalho de autoria e pausa de terminal. |
-| `include/` | Diretório dedicado para arquivos de cabeçalho (`.hpp` / `.h`). |
-| `.vscode/launch.json` | Configuração de depuração multiplataforma (`cppdbg`) com blocos dedicados para `windows` (MSYS2 GDB), `linux` (`/usr/bin/gdb`) e `osx` (`lldb`). |
-| `.vscode/settings.json` | Habilita `compile_commands.json` e configura o `--query-driver` do `clangd` para compiladores no Windows (MSYS2), Linux e macOS. |
-| `CMakeLists.txt` | Configuração CMake com C++23 estrito, `CMAKE_BUILD_TYPE` padrão `Debug` não-destrutivo (respeita `-DCMAKE_BUILD_TYPE=Release` e geradores multi-config), inclusão de `include/`, coleta em `src/*.cpp`, flags rigorosas (`/W4 /permissive- /EHsc` no MSVC; `-Wall -Wextra -Wconversion -Wsign-conversion -pedantic-errors` no GCC/Clang) e linkagem automática de `stdc++exp` via `CheckLinkerFlag` para `<print>` e `<stacktrace>`. |
-| `.gitignore` | Ignora pastas de build (`build/`, `out/`), binários e caches locais do `.vscode/*`, preservando `!.vscode/launch.json` e `!.vscode/settings.json` no controle de versão. |
+| `src/main.cpp` | Ponto de entrada com `std::setlocale(LC_ALL, "")` e pausa de terminal. |
+| `include/` | Cabeçalhos do projeto (`.hpp` / `.h`). |
+| `.vscode/launch.json` | Depuração `cppdbg` para `windows`, `linux` e `osx`. |
+| `.vscode/settings.json` | `compile_commands.json` + `--query-driver` multiplataforma para `clangd`. |
+| `CMakeLists.txt` | C++23 estrito, `Debug` padrão não-destrutivo, flags (`/W4 /permissive-` ou `-Wall -Wextra -Wconversion -Wsign-conversion -pedantic-errors`) e linkagem opcional de `stdc++exp`. |
+| `.gitignore` | Ignora artefatos de build/binários e `.vscode/*`, preservando `launch.json` e `settings.json`. |
 
-### 4.2. Arquitetura Interna do Gerador (`cpp-bootstrap`)
+### 3.2. Arquitetura Interna (`cpp-bootstrap`)
 
 ```text
 cpp-bootstrap/
 ├── .github/workflows/
-│   ├── ci.yml                  # CI multiplataforma (Ubuntu, Windows MSVC/MSYS2, macOS)
-│   └── release.yml             # Publicacao automatica de binarios ao criar tags v*
+│   ├── ci.yml                     # CI multiplataforma (Ubuntu, Windows MSVC/MSYS2, macOS)
+│   └── release.yml                # Publicacao automatica de Releases em tags v*
 ├── include/
-│   ├── terminal.hpp            # Deteccao de SO, ANSI/VT e helpers de saida
-│   ├── cli.hpp                 # Parser de argumentos e mensagens de ajuda/tutorial
-│   ├── validator.hpp           # Validacao uniforme de nomes (5 regras)
-│   ├── templates.hpp           # Templates embutidos (R"tpl(...)tpl") e renderizacao
-│   └── generator.hpp           # Escrita UTF-8 sem BOM + DirectoryRollbackGuard (RAII)
+│   ├── terminal.hpp               # Terminal::{Cores, Ambiente, Saida}
+│   ├── cli.hpp                    # CLI::{VERSAO, Acao, Opcoes, Parser, Telas}
+│   ├── validator.hpp              # Validadores::validarNomeProjeto
+│   ├── templates.hpp              # Templates::{VSCode, Projeto, Render}
+│   └── generator.hpp              # Gerador::{Seguranca, Arquivo, Projeto}
 ├── src/
 │   ├── cli.cpp
 │   ├── validator.cpp
 │   ├── generator.cpp
-│   └── main.cpp
+│   └── main.cpp                   # App::{Banner, Fluxo} e main()
 ├── tests/
-│   └── test_cpp_bootstrap.cpp  # Suite nativa em C++23 integrada ao CTest
+│   ├── test_harness.hpp           # Testes::{Infra, Arquivos} (GuardaSandboxTemp)
+│   ├── test_process.hpp           # Testes::Processo (subprocessos Win32/POSIX)
+│   ├── test_unit.hpp              # Testes::Unitarios (01-07)
+│   ├── test_cli_integration.hpp   # Testes::IntegracaoCli (08-12)
+│   ├── test_artifacts.hpp         # Testes::Artefatos (13-19)
+│   ├── test_real_build.hpp        # Testes::BuildReal (20)
+│   └── test_cpp_bootstrap.cpp     # Orquestrador da suite (CTest)
 └── CMakeLists.txt
 ```
 
@@ -126,48 +115,44 @@ cpp-bootstrap/
 
 ## 4. Compilação e Execução de Projetos Gerados
 
-Após criar seu projeto:
-
 ```powershell
 cd MeuProjeto
-code .
+code .           # Pressione F5 no VS Code para compilar e depurar
 ```
 
-- **No VS Code:** pressione **F5** para compilar automaticamente e iniciar o depurador (`gdb` no Windows/Linux, `lldb` no macOS).
-- **Via Terminal:**
-  ```powershell
-  cmake -B build
-  cmake --build build
-  ./build/MeuProjeto.exe   # Windows
-  ./build/MeuProjeto       # Linux / macOS
-  ```
+Ou via terminal:
+
+```powershell
+cmake -B build
+cmake --build build
+./build/MeuProjeto.exe   # Windows
+./build/MeuProjeto       # Linux / macOS
+```
 
 ---
 
 ## 5. Testes Automatizados (CTest) e CI/CD
 
-A suíte de testes em [`tests/test_cpp_bootstrap.cpp`](tests/test_cpp_bootstrap.cpp) não utiliza dependências externas, executa em sandbox temporário isolado com limpeza automática via RAII (`TempSandboxGuard`) e cobre **20 cenários**:
+A suíte em [`tests/`](tests/) executa em sandbox temporário RAII (`GuardaSandboxTemp`) cobrindo **20 cenários**:
 
-| Nº | Categoria | Descrição do Teste |
+| Nº | Categoria | Escopo |
 | :--- | :--- | :--- |
-| **01–07** | **Unitários** | Normalização (`trim_project_name`), rejeição de vazios/espaços/caracteres proibidos/ponto final/nomes reservados (`CON`, `AUX`, etc.) e `parse_cli` |
-| **08–12** | **Integração CLI & Segurança** | Códigos de saída (`1` sem args, `0` em `--help`/`--version`, `2` em entradas inválidas e flags desconhecidas), bloqueio de sobrescrita e rollback RAII (`DirectoryRollbackGuard`) |
-| **13–19** | **Estrutura & Encoding** | Trim ponta a ponta, `--quiet`, diretórios gerados, `main.cpp`, `.vscode/*.json`, `CMakeLists.txt` (9 seções), `.gitignore` e auditoria binária UTF-8 sem BOM + LF |
-| **20** | **Integração Real C++23** | Configuração e compilação real via CMake (`-DCMAKE_BUILD_TYPE=Release`) + linkagem e execução de `<print>` / `<stacktrace>` via `stdc++exp` (`--include-build`) |
-
-### Como Rodar os Testes Localmente
+| **01–07** | **Unitários** | `limparNomeProjeto`, `validarNomeProjeto` (5 regras) e `analisarArgs` |
+| **08–12** | **Integração CLI & Segurança** | Códigos `0`/`1`/`2`, colisões e `DirectoryRollbackGuard` (`confirmar()`/`foiConfirmado()`) |
+| **13–19** | **Estrutura & Encoding** | Trim ponta a ponta, `--quiet`, templates gerados, UTF-8 sem BOM e LF |
+| **20** | **Build Real C++23** | CMake `Release` + compilação e execução com `<print>` / `<stacktrace>` via `stdc++exp` (`--include-build`) |
 
 ```powershell
-# Padrao via CTest (testes 01 a 19; teste 20 marcado como SKIP)
+# Padrao via CTest (testes 01-19; teste 20 marcado como SKIP)
 ctest --test-dir build -C Release --output-on-failure
 
-# Suite completa incluindo compilacao real C++23 (Windows MSYS2 / Linux / macOS)
+# Suite completa (Windows MSYS2 / Linux / macOS)
 ./build/test_cpp_bootstrap --target-exe ./build/cpp-bootstrap --include-build
 
 # Suite completa (Windows MSVC)
 ./build/Release/test_cpp_bootstrap.exe --target-exe ./build/Release/cpp-bootstrap.exe --include-build
 ```
 
-### Automação no GitHub Actions
-- **CI (`.github/workflows/ci.yml`):** valida build e executa todos os 20 testes a cada `push` ou `pull_request` na branch `main` em **Ubuntu 24.04 (GCC 14)**, **Windows (MSVC)**, **Windows (MSYS2 UCRT64 GCC)** e **macOS 15 (Clang)**.
-- **Releases (`.github/workflows/release.yml`):** ao enviar uma tag no formato `v*` (ex.: `git tag -a v1.0.0 -m "release: v1.0.0" && git push origin v1.0.0`), compila os binários em `Release`, roda o `CTest` e publica automaticamente os pacotes `.zip` e `.tar.gz` na página de **GitHub Releases**.
+### GitHub Actions
+- **CI (`ci.yml`):** roda build e os 20 testes em **Ubuntu 24.04 (GCC 14)**, **Windows (MSVC)**, **Windows (MSYS2 UCRT64 GCC)** e **macOS 15 (Clang)**.
+- **Releases (`release.yml`):** ao enviar uma tag `v*`, gera e publica os pacotes `.zip` e `.tar.gz` em **GitHub Releases**.
