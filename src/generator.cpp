@@ -2,17 +2,16 @@
 AUTOR: Bruno Costa
 DATA: 16/11/2026
 PROPOSITO: Criacao transacional da estrutura do projeto com gravacao em UTF-8 sem BOM e LF.
-
 */
-
-#include "generator.hpp"
-
-#include "templates.hpp"
 
 #include <fstream>
 #include <stdexcept>
 #include <system_error>
 #include <utility>
+
+#include "generator.hpp"
+#include "templates.hpp"
+
 
 namespace bootstrap {
 
@@ -92,11 +91,11 @@ bool create_project(
         std::filesystem::create_directory(vscode_dir);
 
         // Gera os 5 arquivos padrao em UTF-8 sem BOM e LF
-        write_utf8_no_bom(vscode_dir / "launch.json", tpl::kLaunchJson);
-        write_utf8_no_bom(vscode_dir / "settings.json", tpl::kSettingsJson);
-        write_utf8_no_bom(src_dir / "main.cpp", tpl::kMainCpp);
-        write_utf8_no_bom(project_root / "CMakeLists.txt", tpl::render_cmake_lists(project_name));
-        write_utf8_no_bom(project_root / ".gitignore", tpl::kGitignore);
+        write_utf8_no_bom(vscode_dir /   "launch.json",    Templates::kLaunchJson);
+        write_utf8_no_bom(vscode_dir /   "settings.json",  Templates::kSettingsJson);
+        write_utf8_no_bom(src_dir /      "main.cpp",       Templates::kMainCpp);
+        write_utf8_no_bom(project_root / "CMakeLists.txt", Templates::render_cmake_lists(project_name));
+        write_utf8_no_bom(project_root / ".gitignore",     Templates::kGitignore);
 
         // Tudo gravado com sucesso: desarma o rollback
         rollback_guard.commit();
