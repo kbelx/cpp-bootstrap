@@ -4,109 +4,148 @@ DATA: 16/11/2026
 PROPOSITO: Criacao transacional da estrutura do projeto com gravacao em UTF-8 sem BOM e LF.
 */
 
+//============================ [ CABECALHOS PADRAO ] ===========================
+
 #include <fstream>
 #include <stdexcept>
 #include <system_error>
 #include <utility>
 
+//=========================== [ CABECALHOS DO PROJETO ] ========================
+
 #include "generator.hpp"
 #include "templates.hpp"
 
+//=========================== [ SEGURANCA / RAII ] =============================
 
-namespace bootstrap {
+namespace Gerador::Seguranca {
 
-DirectoryRollbackGuard::DirectoryRollbackGuard(std::filesystem::path root_path) noexcept
-    : root_path_(std::move(root_path)) {}
+    DirectoryRollbackGuard::DirectoryRollbackGuard(std::filesystem::path CaminhoRaizParam) noexcept
+        : CaminhoRaiz{std::move(CaminhoRaizParam)} {}
 
-DirectoryRollbackGuard::~DirectoryRollbackGuard() noexcept {
-    if (!committed_ && !root_path_.empty()) {
-        std::error_code ec;
-        std::filesystem::remove_all(root_path_, ec);
-    }
-}
-
-void DirectoryRollbackGuard::commit() noexcept {
-    committed_ = true;
-}
-
-bool DirectoryRollbackGuard::is_committed() const noexcept {
-    return committed_;
-}
-
-void write_utf8_no_bom(const std::filesystem::path& file_path, std::string_view content) {
-    // Padroniza quebras de linha em LF e garante newline final (regra POSIX/C++)
-    std::string normalized;
-    normalized.reserve(content.size() + 1);
-
-    for (std::size_t i = 0; i < content.size(); ++i) {
-        if (content[i] == '\r' && (i + 1 < content.size()) && content[i + 1] == '\n') {
-            normalized.push_back('\n');
-            ++i;
-        }
-        else {
-            normalized.push_back(content[i]);
+    DirectoryRollbackGuard::~DirectoryRollbackGuard() noexcept {
+        if (!Confirmado && !CaminhoRaiz.empty()) {
+            std::error_code CodigoErro{};
+            std::filesystem::remove_all(CaminhoRaiz, CodigoErro);
         }
     }
 
-    if (normalized.empty() || normalized.back() != '\n') {
-        normalized.push_back('\n');
+    void DirectoryRollbackGuard::confirmar() noexcept {
+        Confirmado = true;
     }
 
-    // Modo binario impede que a CRT do Windows converta '\n' em "\r\n"
-    std::ofstream ofs(file_path, std::ios::binary | std::ios::trunc);
-    if (!ofs.is_open()) {
-        throw std::runtime_error("Nao foi possivel abrir o arquivo para escrita: " + file_path.string());
+    bool DirectoryRollbackGuard::foiConfirmado() const noexcept {
+        return Confirmado;
     }
 
-    ofs.write(normalized.data(), static_cast<std::streamsize>(normalized.size()));
-    ofs.flush();
-    if (!ofs.good()) {
-        throw std::runtime_error("Falha ao gravar dados no arquivo: " + file_path.string());
+}  // namespace Gerador::Seguranca
+
+//=========================== [ ESCRITA DE ARQUIVOS ] ==========================
+
+namespace Gerador::Arquivo {
+
+    [[nodiscard]] std::string normalizarQuebrasLinha(std::string_view Conteudo) {
+        std::string Normalizado{};
+        Normalizado.reserve(Conteudo.size() + 1);
+
+        for (std::size_t Indice{0}; Indice < Conteudo.size(); ++Indice) {
+            if (Conteudo[Indice] == '\r' &&
+                (Indice + 1 < Conteudo.size()) &&
+                Conteudo[Indice + 1] == '\n') {
+                Normalizado.push_back('\n');
+                ++Indice;
+            }
+            else {
+                Normalizado.push_back(Conteudo[Indice]);
+            }
+        }
+
+        if (Normalizado.empty() || Normalizado.back() != '\n') {
+            Normalizado.push_back('\n');
+        }
+        return Normalizado;
     }
-}
 
-bool create_project(
-    const std::filesystem::path& base_dir,
-    std::string_view project_name,
-    std::string* out_error
-) {
-    try {
-        const std::filesystem::path project_root = base_dir / std::filesystem::path(project_name);
+    void gravarUtf8SemBom(const std::filesystem::path& CaminhoArq, std::string_view Conteudo) {
+        // Padroniza quebras de linha em LF e garante newline final (regra POSIX/C++)
+        const std::string CONTEUDO_LF{normalizarQuebrasLinha(Conteudo)};
 
-        // Cria a pasta raiz primeiro e arma o rollback RAII imediatamente
-        if (!std::filesystem::create_directory(project_root)) {
-            if (out_error != nullptr) {
-                *out_error = "Nao foi possivel criar o diretorio raiz: " + project_root.string();
+        // Modo binario impede que a CRT do Windows converta '\n' em "\r\n"
+        std::ofstream FluxoSaida{CaminhoArq, std::ios::binary | std::ios::trunc};
+        if (!FluxoSaida.is_open()) {
+            throw std::runtime_error(
+                "Nao foi possivel abrir o arquivo para escrita: " + CaminhoArq.string()
+            );
+        }
+
+        FluxoSaida.write(CONTEUDO_LF.data(), static_cast<std::streamsize>(CONTEUDO_LF.size()));
+        FluxoSaida.flush();
+        if (!FluxoSaida.good()) {
+            throw std::runtime_error(
+                "Falha ao gravar dados no arquivo: " + CaminhoArq.string()
+            );
+        }
+    }
+
+}  // namespace Gerador::Arquivo
+
+//=========================== [ GERACAO DO PROJETO ] ===========================
+
+namespace Gerador::Projeto {
+
+    void criarSubdiretorios(const std::filesystem::path& RaizProjeto) {
+        std::filesystem::create_directory(RaizProjeto / "src");
+        std::filesystem::create_directory(RaizProjeto / "include");
+        std::filesystem::create_directory(RaizProjeto / ".vscode");
+    }
+
+    void gerarArquivosPadrao(
+        const std::filesystem::path& RaizProjeto,
+        std::string_view NomeProjeto
+    ) {
+        const std::filesystem::path DIR_SRC{RaizProjeto / "src"};
+        const std::filesystem::path DIR_VSCODE{RaizProjeto / ".vscode"};
+
+        Arquivo::gravarUtf8SemBom(DIR_VSCODE / "launch.json",    Templates::VSCode::LAUNCH_JSON);
+        Arquivo::gravarUtf8SemBom(DIR_VSCODE / "settings.json",  Templates::VSCode::SETTINGS_JSON);
+        Arquivo::gravarUtf8SemBom(DIR_SRC /    "main.cpp",       Templates::Projeto::MAIN_CPP);
+        Arquivo::gravarUtf8SemBom(
+            RaizProjeto / "CMakeLists.txt",
+            Templates::Render::renderizarCMake(NomeProjeto)
+        );
+        Arquivo::gravarUtf8SemBom(RaizProjeto / ".gitignore",    Templates::Projeto::GITIGNORE);
+    }
+
+    bool criarProjeto(
+        const std::filesystem::path& DirBase,
+        std::string_view NomeProjeto,
+        std::string* ErroSaida
+    ) {
+        try {
+            const std::filesystem::path RAIZ_PROJETO{DirBase / std::filesystem::path{NomeProjeto}};
+
+            // Cria a pasta raiz primeiro e arma o rollback RAII imediatamente
+            if (!std::filesystem::create_directory(RAIZ_PROJETO)) {
+                if (ErroSaida != nullptr) {
+                    *ErroSaida = "Nao foi possivel criar o diretorio raiz: " + RAIZ_PROJETO.string();
+                }
+                return false;
+            }
+            Seguranca::DirectoryRollbackGuard GuardaRollback{RAIZ_PROJETO};
+
+            criarSubdiretorios(RAIZ_PROJETO);
+            gerarArquivosPadrao(RAIZ_PROJETO, NomeProjeto);
+
+            // Tudo gravado com sucesso: desarma o rollback
+            GuardaRollback.confirmar();
+            return true;
+        }
+        catch (const std::exception& Excecao) {
+            if (ErroSaida != nullptr) {
+                *ErroSaida = Excecao.what();
             }
             return false;
         }
-        DirectoryRollbackGuard rollback_guard(project_root);
-
-        const std::filesystem::path src_dir     = project_root / "src";
-        const std::filesystem::path include_dir = project_root / "include";
-        const std::filesystem::path vscode_dir  = project_root / ".vscode";
-
-        std::filesystem::create_directory(src_dir);
-        std::filesystem::create_directory(include_dir);
-        std::filesystem::create_directory(vscode_dir);
-
-        // Gera os 5 arquivos padrao em UTF-8 sem BOM e LF
-        write_utf8_no_bom(vscode_dir /   "launch.json",    Templates::kLaunchJson);
-        write_utf8_no_bom(vscode_dir /   "settings.json",  Templates::kSettingsJson);
-        write_utf8_no_bom(src_dir /      "main.cpp",       Templates::kMainCpp);
-        write_utf8_no_bom(project_root / "CMakeLists.txt", Templates::render_cmake_lists(project_name));
-        write_utf8_no_bom(project_root / ".gitignore",     Templates::kGitignore);
-
-        // Tudo gravado com sucesso: desarma o rollback
-        rollback_guard.commit();
-        return true;
     }
-    catch (const std::exception& ex) {
-        if (out_error != nullptr) {
-            *out_error = ex.what();
-        }
-        return false;
-    }
-}
 
-}  // namespace bootstrap
+}  // namespace Gerador::Projeto

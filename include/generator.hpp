@@ -4,44 +4,66 @@ DATA: 16/11/2026
 PROPOSITO: Declaracao do rollback RAII (DirectoryRollbackGuard), escrita UTF-8 sem BOM e geracao do projeto.
 */
 
-#ifndef GENERATOR_H
-#define GENERATOR_H
+#ifndef GENERATOR_HPP
+#define GENERATOR_HPP
 
-    #include <filesystem>
-    #include <string>
-    #include <string_view>
+//============================ [ CABECALHOS PADRAO ] ===========================
 
-    namespace bootstrap {
-        
-        // Guarda RAII que remove recursivamente a pasta raiz criada caso ocorra falha antes de commit().
-        class DirectoryRollbackGuard {
-            public:
-            explicit DirectoryRollbackGuard(std::filesystem::path root_path) noexcept;
+#include <filesystem>
+#include <string>
+#include <string_view>
+
+//=========================== [ SEGURANCA / RAII ] =============================
+
+namespace Gerador::Seguranca {
+
+    // Guarda RAII que remove recursivamente a pasta raiz criada caso ocorra falha antes de confirmar().
+    class DirectoryRollbackGuard {
+        public:
+            explicit DirectoryRollbackGuard(std::filesystem::path CaminhoRaizParam) noexcept;
             ~DirectoryRollbackGuard() noexcept;
-            
+
             DirectoryRollbackGuard(const DirectoryRollbackGuard&) = delete;
             DirectoryRollbackGuard& operator=(const DirectoryRollbackGuard&) = delete;
             DirectoryRollbackGuard(DirectoryRollbackGuard&&) = delete;
             DirectoryRollbackGuard& operator=(DirectoryRollbackGuard&&) = delete;
-            
-            void commit() noexcept;
-            [[nodiscard]] bool is_committed() const noexcept;
-            
-            private:
-            std::filesystem::path root_path_;
-            bool committed_ = false;
-        };
-        
-        // Grava arquivo estritamente em UTF-8 sem BOM com quebras de linha LF e newline final.
-        void write_utf8_no_bom(const std::filesystem::path& file_path, std::string_view content);
-        
-        // Gera toda a estrutura do projeto sem alterar o diretorio de trabalho (com rollback automatico).
-        [[nodiscard]] bool create_project(
-            const std::filesystem::path& base_dir,
-            std::string_view project_name,
-            std::string* out_error = nullptr
-        );
-        
-    }  // namespace bootstrap
+
+            void confirmar() noexcept;
+            [[nodiscard]] bool foiConfirmado() const noexcept;
+
+        private:
+            std::filesystem::path CaminhoRaiz{};
+            bool Confirmado{false};
+    };
+
+}  // namespace Gerador::Seguranca
+
+//=========================== [ ESCRITA DE ARQUIVOS ] ==========================
+
+namespace Gerador::Arquivo {
+
+    // Grava arquivo estritamente em UTF-8 sem BOM com quebras de linha LF e newline final.
+    void gravarUtf8SemBom(const std::filesystem::path& CaminhoArq, std::string_view Conteudo);
+
+}  // namespace Gerador::Arquivo
+
+//=========================== [ GERACAO DO PROJETO ] ===========================
+
+namespace Gerador::Projeto {
+
+    // Gera toda a estrutura do projeto sem alterar o diretorio de trabalho (com rollback automatico).
+    [[nodiscard]] bool criarProjeto(
+        const std::filesystem::path& DirBase,
+        std::string_view NomeProjeto,
+        std::string* ErroSaida = nullptr
+    );
+
+}  // namespace Gerador::Projeto
+
+namespace Gerador {
+
+    using Seguranca::DirectoryRollbackGuard;
+
+}  // namespace Gerador
 
 #endif
