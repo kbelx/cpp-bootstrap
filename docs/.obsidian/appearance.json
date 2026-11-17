@@ -1,0 +1,8 @@
+{
+  "showRibbon": false,
+  "theme": "system",
+  "accentColor": "#d3c49f",
+  "interfaceFontFamily": "IBM Plex Sans",
+  "monospaceFontFamily": "JetBrains Mono",
+  "cssTheme": "Minimal"
+}

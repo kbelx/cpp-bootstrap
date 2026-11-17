@@ -17,7 +17,7 @@ GitHub Actions são arquivos `.yml` dentro de `.github/workflows/`. O GitHub os 
 | Windows (MSYS2 UCRT64 GCC) | `windows-latest` | `msys2/setup-msys2@v2` + gerador Ninja + runtime estático |
 | macOS 15 (Clang) | `macos-15` | Clang do Xcode |
 
-> [!NOTE]
+> [!info]
 > No Ubuntu é instalado o GCC 14 porque o compilador padrão da imagem pode não ter `<print>` completo.
 
 Onde ver: aba **Actions** do repositório → workflow **CI**. Cada job mostra o log de cada passo.

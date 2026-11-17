@@ -6,6 +6,7 @@
 ## Funções
 
 - `print_success_banner(project_name, quiet)` *(namespace anônimo)* — imprime confirmação, próximos passos (`cd`, `code .`, `cmake -B build`, `cmake --build build`), SO detectado e, se `!quiet`, rodapé do autor com links (OSC 8 quando `Palette::enabled`).
+
 - `main(argc, argv)` — executa `parse_cli()` e despacha:
   - `ShowTutorialError` → `print_tutorial()`, retorna `1`.
   - `ShowHelp` / `ShowVersion` → `print_help()` / `print_version()`, retorna `0`.
