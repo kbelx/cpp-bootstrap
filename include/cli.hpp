@@ -4,44 +4,62 @@ DATA: 16/11/2026
 PROPOSITO: Declaracoes de opcoes da CLI, normalizacao de nome e exibicao de ajuda/versao.
 */
 
-#ifndef CLI_H
-#define CLI_H
+#ifndef CLI_HPP
+#define CLI_HPP
 
-    #include <string>
-    #include <string_view>
+//============================ [ CABECALHOS PADRAO ] ===========================
 
-    namespace bootstrap {
+#include <string>
+#include <string_view>
 
-    enum class CliAction {
-        CreateProject,
-        ShowTutorialError,
-        ShowHelp,
-        ShowVersion,
-        InvalidFlag
+//=========================== [ TIPOS E OPCOES CLI ] ===========================
+
+namespace CLI {
+
+    inline constexpr std::string_view VERSAO{"1.0.0"};
+
+    enum class Acao {
+        CRIAR_PROJETO,
+        EXIBIR_ERRO_TUTORIAL,
+        EXIBIR_AJUDA,
+        EXIBIR_VERSAO,
+        FLAG_INVALIDA
     };
 
-    struct CliOptions {
-        CliAction action = CliAction::ShowTutorialError;
-        std::string project_name;
-        std::string unknown_flag;
-        bool quiet = false;
+    struct Opcoes {
+        Acao AcaoEscolhida{Acao::EXIBIR_ERRO_TUTORIAL};
+        std::string NomeProjeto{};
+        std::string FlagDesconhecida{};
+        bool Silencioso{false};
     };
+
+}  // namespace CLI
+
+//============================= [ PARSER DA CLI ] ==============================
+
+namespace CLI::Parser {
 
     // Remove espacos e aspas envolventes externas uma unica vez antes da validacao.
-    [[nodiscard]] std::string trim_project_name(std::string_view raw);
+    [[nodiscard]] std::string limparNomeProjeto(std::string_view Bruto);
 
-    // Faz o parse dos argumentos de linha de comando preservando multi-tokens sem aspas.
-    [[nodiscard]] CliOptions parse_cli(int argc, const char* const* argv);
+    // Analisa os argumentos de linha de comando preservando multi-tokens sem aspas.
+    [[nodiscard]] Opcoes analisarArgs(int QtdArgs, const char* const* VetorArgs);
+
+}  // namespace CLI::Parser
+
+//=========================== [ TELAS DE EXIBICAO ] ============================
+
+namespace CLI::Telas {
 
     // Exibe o tutorial rapido quando executado sem argumentos (exit 1).
-    void print_tutorial();
+    void exibirTutorial();
 
     // Exibe a ajuda completa de uso e opcoes (-h / --help).
-    void print_help();
+    void exibirAjuda();
 
     // Exibe a versao do utilitario (-v / --version).
-    void print_version();
+    void exibirVersao();
 
-    }  // namespace bootstrap
+}  // namespace CLI::Telas
 
 #endif

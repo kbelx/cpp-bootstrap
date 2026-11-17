@@ -1,158 +1,184 @@
 /*
 AUTOR: Bruno Costa
 DATA: 16/11/2026
-PROPOSITO: Implementacao do parser de linha de comando, trim do nome e telas de tutorial/ajuda.
+PROPOSITO: Implementacao do parser de linha de comando, limpeza do nome e telas de tutorial/ajuda.
 */
+
+//============================ [ CABECALHOS PADRAO ] ===========================
+
+#include <vector>
+
+//=========================== [ CABECALHOS DO PROJETO ] ========================
 
 #include "cli.hpp"
 #include "terminal.hpp"
 
-#include <vector>
+//======================== [ AUXILIARES DE TEXTO / FLAGS ] =====================
 
-namespace bootstrap {
+static constexpr std::string_view CORPO_AJUDA{
+R"ajuda(Gerador de projetos C++23 com estrutura padrao, CMake e VS Code.
 
-namespace {
+Uso:
+    cpp-bootstrap <NomeDoProjeto> [opcoes]
 
-[[nodiscard]] constexpr bool is_ascii_space(char ch) noexcept {
-    return ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r' || ch == '\v' || ch == '\f';
-}
+Opcoes:
+    -q, --quiet      Suprime o rodape de autoria e links
+    -h, --help       Exibe esta mensagem de ajuda
+    -v, --version    Exibe a versao do programa
 
-[[nodiscard]] std::string_view strip_outer_spaces(std::string_view sv) noexcept {
-    while (!sv.empty() && is_ascii_space(sv.front())) {
-        sv.remove_prefix(1);
-    }
-    while (!sv.empty() && is_ascii_space(sv.back())) {
-        sv.remove_suffix(1);
-    }
-    return sv;
-}
+Regras para NomeDoProjeto:
+    * Apenas letras ASCII, numeros, '_' e '-'
+    * Sem espacos e sem iniciar com '-')ajuda"
+};
 
-[[nodiscard]] std::string_view strip_outer_char(std::string_view sv, char target) noexcept {
-    while (!sv.empty() && sv.front() == target) {
-        sv.remove_prefix(1);
-    }
-    while (!sv.empty() && sv.back() == target) {
-        sv.remove_suffix(1);
-    }
-    return sv;
-}
+namespace CLI::Auxiliar {
 
-[[nodiscard]] bool is_help_flag(std::string_view token) noexcept {
-    return token == "-h" || token == "--help" || token == "/?";
-}
-
-[[nodiscard]] bool is_version_flag(std::string_view token) noexcept {
-    return token == "-v" || token == "--version";
-}
-
-[[nodiscard]] bool is_quiet_flag(std::string_view token) noexcept {
-    return token == "-q" || token == "--quiet" || token == "-Quiet" || token == "-quiet";
-}
-
-}  // namespace
-
-std::string trim_project_name(std::string_view raw) {
-    std::string_view sv = strip_outer_spaces(raw);
-    sv = strip_outer_char(sv, '"');
-    sv = strip_outer_char(sv, '\'');
-    sv = strip_outer_spaces(sv);
-    return std::string(sv);
-}
-
-CliOptions parse_cli(int argc, const char* const* argv) {
-    CliOptions options{};
-    if (argc <= 1 || argv == nullptr) {
-        options.action = CliAction::ShowTutorialError;
-        return options;
+    [[nodiscard]] constexpr bool ehEspacoAscii(char Caractere) noexcept {
+        return Caractere == ' '  || Caractere == '\t' || Caractere == '\n' ||
+               Caractere == '\r' || Caractere == '\v' || Caractere == '\f';
     }
 
-    std::vector<std::string_view> name_parts;
-
-    for (int i = 1; i < argc; ++i) {
-        const char* raw_arg = argv[i];
-        if (raw_arg == nullptr) {
-            continue;
+    [[nodiscard]] std::string_view removerEspacosExternos(std::string_view Texto) noexcept {
+        while (!Texto.empty() && ehEspacoAscii(Texto.front())) {
+            Texto.remove_prefix(1);
         }
-        const std::string_view token(raw_arg);
-
-        if (is_help_flag(token)) {
-            options.action = CliAction::ShowHelp;
-            return options;
+        while (!Texto.empty() && ehEspacoAscii(Texto.back())) {
+            Texto.remove_suffix(1);
         }
-        if (is_version_flag(token)) {
-            options.action = CliAction::ShowVersion;
-            return options;
-        }
-        if (is_quiet_flag(token)) {
-            options.quiet = true;
-            continue;
-        }
-
-        // Flags longas desconhecidas (--foo) ou curtas apos um nome (-x) sao rejeitadas como opcoes invalidas.
-        if (token.starts_with("--") ||
-            (token.starts_with('-') && (!name_parts.empty() || token.size() == 2))) {
-            options.action = CliAction::InvalidFlag;
-            options.unknown_flag = std::string(token);
-            return options;
-        }
-
-        name_parts.push_back(token);
+        return Texto;
     }
 
-    std::string joined;
-    for (std::size_t idx = 0; idx < name_parts.size(); ++idx) {
-        if (idx > 0) {
-            joined.push_back(' ');
+    [[nodiscard]] std::string_view removerCaractereExterno(std::string_view Texto, char Alvo) noexcept {
+        while (!Texto.empty() && Texto.front() == Alvo) {
+            Texto.remove_prefix(1);
         }
-        joined.append(name_parts[idx]);
+        while (!Texto.empty() && Texto.back() == Alvo) {
+            Texto.remove_suffix(1);
+        }
+        return Texto;
     }
 
-    options.action = CliAction::CreateProject;
-    options.project_name = trim_project_name(joined);
-    return options;
-}
+    [[nodiscard]] std::string juntarPartesNome(const std::vector<std::string_view>& PartesNome) {
+        std::string Unido{};
+        for (std::size_t Indice{0}; Indice < PartesNome.size(); ++Indice) {
+            if (Indice > 0) {
+                Unido.push_back(' ');
+            }
+            Unido.append(PartesNome[Indice]);
+        }
+        return Unido;
+    }
 
-//============================== [ TUTORIAL ] ==================================
+    [[nodiscard]] bool ehFlagAjuda(std::string_view Token) noexcept {
+        return Token == "-h" || Token == "--help" || Token == "/?";
+    }
 
-void print_tutorial() {
-    Terminal::Saida::separador();
-    Terminal::Saida::imprimirLinha("Uso:");
+    [[nodiscard]] bool ehFlagVersao(std::string_view Token) noexcept {
+        return Token == "-v" || Token == "--version";
+    }
 
-#if defined(_WIN32)
-    Terminal::Saida::imprimirLinha("  cpp-bootstrap NomeDoProjeto");
-#else
-    Terminal::Saida::imprimirLinha("  ./cpp-bootstrap NomeDoProjeto");
-#endif
+    [[nodiscard]] bool ehFlagSilenciosa(std::string_view Token) noexcept {
+        return Token == "-q" || Token == "--quiet" || Token == "-Quiet" || Token == "-quiet";
+    }
 
-    Terminal::Saida::imprimirLinha("");
-    Terminal::Saida::imprimirLinha("Dica: use apenas o nome real do projeto, sem < > ou espacos.");
-    Terminal::Saida::separador();
-}
+    // Flags longas desconhecidas (--foo) ou curtas apos um nome (-x) sao rejeitadas como opcoes invalidas.
+    [[nodiscard]] bool ehFlagInvalida(std::string_view Token, bool PossuiPartesNome) noexcept {
+        return Token.starts_with("--") ||
+               (Token.starts_with('-') && (PossuiPartesNome || Token.size() == 2));
+    }
 
-void print_help() {
-    Terminal::Saida::separador();
-    Terminal::Saida::imprimirColorido(
-        Terminal::Cores::CIANO,
-        "cpp-bootstrap v" + std::string(Terminal::Ambiente::VERSAO)
-    );
-    Terminal::Saida::imprimirLinha("Gerador de projetos C++23 com estrutura padrao, CMake e VS Code.");
-    Terminal::Saida::imprimirLinha("");
-    Terminal::Saida::imprimirLinha("Uso:");
-    Terminal::Saida::imprimirLinha("  cpp-bootstrap <NomeDoProjeto> [opcoes]");
-    Terminal::Saida::imprimirLinha("");
-    Terminal::Saida::imprimirLinha("Opcoes:");
-    Terminal::Saida::imprimirLinha("  -q, --quiet      Suprime o rodape de autoria e links");
-    Terminal::Saida::imprimirLinha("  -h, --help       Exibe esta mensagem de ajuda");
-    Terminal::Saida::imprimirLinha("  -v, --version    Exibe a versao do programa");
-    Terminal::Saida::imprimirLinha("");
-    Terminal::Saida::imprimirLinha("Regras para NomeDoProjeto:");
-    Terminal::Saida::imprimirLinha("  * Apenas letras ASCII, numeros, '_' e '-'");
-    Terminal::Saida::imprimirLinha("  * Sem espacos e sem iniciar com '-'");
-    Terminal::Saida::separador();
-}
+}  // namespace CLI::Auxiliar
 
-void print_version() {
-    Terminal::Saida::imprimirLinha("cpp-bootstrap " + std::string(Terminal::Ambiente::VERSAO));
-}
+//============================= [ PARSER DA CLI ] ==============================
 
-}  // namespace bootstrap
+namespace CLI::Parser {
+
+    std::string limparNomeProjeto(std::string_view Bruto) {
+        std::string_view Texto{Auxiliar::removerEspacosExternos(Bruto)};
+        Texto = Auxiliar::removerCaractereExterno(Texto, '"');
+        Texto = Auxiliar::removerCaractereExterno(Texto, '\'');
+        Texto = Auxiliar::removerEspacosExternos(Texto);
+        return std::string{Texto};
+    }
+
+    Opcoes analisarArgs(int QtdArgs, const char* const* VetorArgs) {
+        Opcoes OpcoesCli{};
+        if (QtdArgs <= 1 || VetorArgs == nullptr) {
+            OpcoesCli.AcaoEscolhida = Acao::EXIBIR_ERRO_TUTORIAL;
+            return OpcoesCli;
+        }
+
+        std::vector<std::string_view> PartesNome{};
+
+        for (int Indice{1}; Indice < QtdArgs; ++Indice) {
+            const char* ARG_BRUTO{VetorArgs[Indice]};
+            if (ARG_BRUTO == nullptr) {
+                continue;
+            }
+            const std::string_view TOKEN{ARG_BRUTO};
+
+            if (Auxiliar::ehFlagAjuda(TOKEN)) {
+                OpcoesCli.AcaoEscolhida = Acao::EXIBIR_AJUDA;
+                return OpcoesCli;
+            }
+            if (Auxiliar::ehFlagVersao(TOKEN)) {
+                OpcoesCli.AcaoEscolhida = Acao::EXIBIR_VERSAO;
+                return OpcoesCli;
+            }
+            if (Auxiliar::ehFlagSilenciosa(TOKEN)) {
+                OpcoesCli.Silencioso = true;
+                continue;
+            }
+            if (Auxiliar::ehFlagInvalida(TOKEN, !PartesNome.empty())) {
+                OpcoesCli.AcaoEscolhida    = Acao::FLAG_INVALIDA;
+                OpcoesCli.FlagDesconhecida = std::string{TOKEN};
+                return OpcoesCli;
+            }
+
+            PartesNome.push_back(TOKEN);
+        }
+
+        OpcoesCli.AcaoEscolhida = Acao::CRIAR_PROJETO;
+        OpcoesCli.NomeProjeto   = limparNomeProjeto(Auxiliar::juntarPartesNome(PartesNome));
+        return OpcoesCli;
+    }
+
+}  // namespace CLI::Parser
+
+//=========================== [ TELAS DE EXIBICAO ] ============================
+
+namespace CLI::Telas {
+
+    void exibirTutorial() {
+        Terminal::Saida::separador();
+        Terminal::Saida::imprimirLinha("Uso:");
+
+    // se o usuario estiver usando Windows...
+    #if defined(_WIN32)
+        Terminal::Saida::imprimirLinha("  cpp-bootstrap NomeDoProjeto");
+
+    // se o usuario estiver usando linux/macOs...
+    #else
+        Terminal::Saida::imprimirLinha("  ./cpp-bootstrap NomeDoProjeto");
+    #endif
+
+        Terminal::Saida::imprimirLinha("");
+        Terminal::Saida::imprimirLinha("Dica: use apenas o nome real do projeto, sem < > ou espacos.");
+        Terminal::Saida::separador();
+    }
+
+    void exibirAjuda() {
+        Terminal::Saida::separador();
+        Terminal::Saida::imprimirColorido(
+            Terminal::Cores::CIANO,
+            "cpp-bootstrap v" + std::string{CLI::VERSAO}
+        );
+        Terminal::Saida::imprimirLinha(CORPO_AJUDA);
+        Terminal::Saida::separador();
+    }
+
+    void exibirVersao() {
+        Terminal::Saida::imprimirLinha("cpp-bootstrap " + std::string{CLI::VERSAO});
+    }
+
+}  // namespace CLI::Telas
