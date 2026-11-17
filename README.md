@@ -1,43 +1,29 @@
----
-title: C++ Bootstrap
-author: Bruno Costa
-tags:
-  - cpp
-  - cpp23
-  - cmake
-  - cli
-  - obsidian
----
-
 # C++ Bootstrap
 
 Ferramenta CLI nativa e multiplataforma escrita em **C++23** para inicialização rápida de projetos **C++23** com **CMake**, estrutura de diretórios padronizada, rollback transacional (RAII) e ambiente pronto para desenvolvimento e depuração no **Visual Studio Code** (Windows, Linux e macOS).
 
-> **Histórico de Versões:** O protótipo original em PowerShell encontra-se congelado na tag [`v0.9.0-beta`](../../tree/v0.9.0-beta) e no branch `legacy/powershell-beta`. A partir da **`v1.0.0`**, o projeto é distribuído como executável nativo em C++23 sem dependências de runtime externas.
+> **Observação:** 
+> - O protótipo original em PowerShell encontra-se congelado na tag [`v0.9.0-beta`](../../tree/v0.9.0-beta) e no branch `legacy/powershell-beta`. 
+> - A partir da **`v1.0.0`**, o projeto é distribuído como executável nativo em C++23 sem dependências de runtime externas.
+
+
+| Info                                     | Descrição                                             |
+| ---------------------------------------- | ----------------------------------------------------- |
+| Autoria                                  | Bruno Costa ([@kbelx](https://github.com/kbelx))      |
+| Padrão                                   | C++23 estrito (`set(CMAKE_CXX_STANDARD_REQUIRED ON)`) |
+| Build System                             | CMake ( _mínimo 3.20_ )                               |
+| Compilador / Debugger Alvo dos Templates | - **Windows:** GCC (`g++`) e GDB via MSYS2 (UCRT64) ou MSVC<br><br>  - **Linux:** GCC / Clang e GDB (`/usr/bin/gdb`)<br><br>  - **macOS:** Clang / GCC e LLDB (`lldb`) |
+
 
 ---
 
-## 1. Apresentação
+## 1. Instalação e Compilação
 
-- **Título:** C++ Bootstrap (`cpp-bootstrap`)
-- **Versão Atual:** `1.0.0`
-- **Descrição:** Gerador CLI de estrutura e arquivos de configuração para novos projetos C++23.
-- **Autoria:** Bruno Costa ([@kbelx](https://github.com/kbelx))
-- **Padrão C++:** C++23 estrito (`set(CMAKE_CXX_STANDARD_REQUIRED ON)`)
-- **Build System:** CMake (mínimo 3.20)
-- **Compilador / Debugger Alvo dos Templates:**
-  - **Windows:** GCC (`g++`) e GDB via MSYS2 (UCRT64) ou MSVC
-  - **Linux:** GCC / Clang e GDB (`/usr/bin/gdb`)
-  - **macOS:** Clang / GCC e LLDB (`lldb`)
+### Opção A - DOWNLOAD BINÁRIO PRONTO (GitHub Releases)
+1. Acesse a aba **Releases** do repositório e baixe o pacote pré-compilado para o seu sistema (`windows-x64.zip`, `linux-x64.tar.gz` ou `macos-arm64.tar.gz`). 
+2. Basta extrair o executável `cpp-bootstrap` para uma pasta no seu `PATH`.
 
----
-
-## 2. Instalação e Compilação
-
-### Opção A — Baixar Binário Pronto (GitHub Releases)
-Acesse a aba **Releases** do repositório e baixe o pacote pré-compilado para o seu sistema (`windows-x64.zip`, `linux-x64.tar.gz` ou `macos-arm64.tar.gz`). Basta extrair o executável `cpp-bootstrap` para uma pasta no seu `PATH`.
-
-### Opção B — Compilar a partir do Código-Fonte
+### Opção B - COMPILAR A PARTIR DO CÓDIGO-FONTE
 
 #### Pré-requisitos
 1. **CMake** 3.20 ou superior.
@@ -61,7 +47,7 @@ cmake --build build --config Release
 
 ---
 
-## 3. Como Usar
+## 2. Como Usar
 
 ```powershell
 # Criar um novo projeto no diretorio atual
@@ -87,7 +73,7 @@ Antes de criar qualquer arquivo no disco, o `cpp-bootstrap` normaliza espaços e
 
 ---
 
-## 4. Estrutura Gerada e Arquitetura do Projeto
+## 3. Estrutura Gerada e Arquitetura do Projeto
 
 ### 4.1. Estrutura Gerada para Novos Projetos
 Todos os arquivos gerados saem estritamente em **UTF-8 sem BOM** com quebras de linha **LF**:
@@ -138,7 +124,7 @@ cpp-bootstrap/
 
 ---
 
-## 5. Compilação e Execução de Projetos Gerados
+## 4. Compilação e Execução de Projetos Gerados
 
 Após criar seu projeto:
 
@@ -158,7 +144,7 @@ code .
 
 ---
 
-## 6. Testes Automatizados (CTest) e CI/CD
+## 5. Testes Automatizados (CTest) e CI/CD
 
 A suíte de testes em [`tests/test_cpp_bootstrap.cpp`](tests/test_cpp_bootstrap.cpp) não utiliza dependências externas, executa em sandbox temporário isolado com limpeza automática via RAII (`TempSandboxGuard`) e cobre **20 cenários**:
 
