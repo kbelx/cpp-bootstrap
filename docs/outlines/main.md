@@ -1,14 +1,19 @@
 # Outline — `main`
 
-- **Implementação:** [main.cpp](../../src/main.cpp) *(sem header próprio; ponto de entrada do executável `cpp-bootstrap`)*
-- **Propósito:** Orquestrar CLI, validação, geração transacional e exibição da mensagem final.
+- **Implementação:** [main.cpp](../../src/main.cpp)
+- **Propósito:** Ponto de entrada do executável `cpp-bootstrap` e exibição do banner final.
 
-## Funções
+## `App::Banner`
+- `URL_GITHUB`, `URL_LINKEDIN` e `formatarLinkOsc8(Url)`.
+- `exibirProximosPassos(NomeProjeto)` e `exibirRodapeAutor()`.
+- `exibirBannerSucesso(NomeProjeto, Silencioso)` — confirma criação, mostra SO e omite rodapé se `Silencioso`.
 
-- `print_success_banner(project_name, quiet)` *(namespace anônimo)* — imprime confirmação, próximos passos (`cd`, `code .`, `cmake -B build`, `cmake --build build`), SO detectado e, se `!quiet`, rodapé do autor com links (OSC 8 quando `Palette::enabled`).
+## `App::Fluxo`
+- `exibirErroFlagInvalida(FlagDesconhecida)` e `exibirErroCriacao(NomeProjeto, DetalheErro)`.
 
-- `main(argc, argv)` — executa `parse_cli()` e despacha:
-  - `ShowTutorialError` → `print_tutorial()`, retorna `1`.
-  - `ShowHelp` / `ShowVersion` → `print_help()` / `print_version()`, retorna `0`.
-  - `InvalidFlag` → erro + dica `--help`, retorna `2`.
-  - `CreateProject` → `test_project_name()` (retorna `2` se inválido) → `create_project()` (retorna `10` em falha de I/O) → `print_success_banner()`, retorna `0`.
+## `main(QtdArgs, VetorArgs)`
+- Analisa argumentos via `CLI::Parser::analisarArgs()` e despacha:
+  - `EXIBIR_ERRO_TUTORIAL` → `CLI::Telas::exibirTutorial()` (`1`).
+  - `EXIBIR_AJUDA` / `EXIBIR_VERSAO` → `exibirAjuda()` / `exibirVersao()` (`0`).
+  - `FLAG_INVALIDA` → `App::Fluxo::exibirErroFlagInvalida()` (`2`).
+  - `CRIAR_PROJETO` → `Validadores::validarNomeProjeto()` (`2` se inválido) → `Gerador::Projeto::criarProjeto()` (`10` em erro de I/O) → `exibirBannerSucesso()` (`0`).
