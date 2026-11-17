@@ -24,6 +24,7 @@ Makefile
 # IDEs e editores locais
 .vscode/
 .idea/
+.cache/
 
 # Arquivos temporarios e logs
 *.tmp
