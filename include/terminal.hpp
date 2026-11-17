@@ -2,172 +2,183 @@
 AUTOR: Bruno Costa
 DATA: 16/11/2026
 PROPOSITO: Deteccao de SO, suporte ANSI/VT e utilitarios de saida formatada no terminal.
-
 */
 
-#pragma once
+#ifndef TERMINAL_HPP
+#define TERMINAL_HPP
 
-//============================ [ DETECCAO DE AMBIENTE ] ========================
+//============================ [ CABECALHOS PADRAO ] ===========================
 
 #include <cstdlib>
 #include <iostream>
 #include <string>
 #include <string_view>
 
-#if defined(__has_include)
-#  if __has_include(<print>)
-#    include <print>
-#  endif
+// Inclui <print> (C++23) quando disponivel na biblioteca padrao do compilador
+#if __has_include(<print>)
+    #include <print>
 #endif
 
+//======================== [ CABECALHOS DE PLATAFORMA ] ========================
+
 #if defined(_WIN32)
-#  ifndef NOMINMAX
-#    define NOMINMAX
-#  endif
-#  ifndef WIN32_LEAN_AND_MEAN
-#    define WIN32_LEAN_AND_MEAN
-#  endif
-#  include <cstdio>
-#  include <io.h>
-#  include <windows.h>
-#  ifndef ENABLE_VIRTUAL_TERMINAL_PROCESSING
-#    define ENABLE_VIRTUAL_TERMINAL_PROCESSING 0x0004
-#  endif
+
+    // Desativa macros min/max legadas da Win32 que conflitam com <algorithm>
+    #ifndef NOMINMAX
+        #define NOMINMAX
+    #endif
+
+    // Exclui APIs raramente usadas de <windows.h> para acelerar a compilacao
+    #ifndef WIN32_LEAN_AND_MEAN
+        #define WIN32_LEAN_AND_MEAN
+    #endif
+
+    #include <windows.h>  // GetStdHandle, GetConsoleMode, SetConsoleMode
+
+    // Fallback para SDKs ou toolchains MinGW antigos sem suporte nativo a flag VT
+    #ifndef ENABLE_VIRTUAL_TERMINAL_PROCESSING
+        #define ENABLE_VIRTUAL_TERMINAL_PROCESSING 0x0004
+    #endif
 #else
-#  include <unistd.h>
+    #include <unistd.h>   // isatty, STDOUT_FILENO (POSIX: Linux / macOS)
 #endif
 
-namespace bootstrap::term {
+//============================ [ PALETA DE CORES ] =============================
 
-inline constexpr std::string_view kVersion = "1.0.0";
+namespace Terminal::Cores {
 
-// Retorna o nome do sistema operacional detectado em tempo de compilacao.
-[[nodiscard]] constexpr std::string_view detect_os_label() noexcept {
-#if defined(_WIN32)
-    return "Windows";
-#elif defined(__APPLE__)
-    return "macOS";
-#else
-    return "Linux";
-#endif
-}
+    inline constexpr std::string_view ESC      = "\x1b";
+    inline constexpr std::string_view RESET    = "\x1b[0m";
+    inline constexpr std::string_view VERDE    = "\x1b[32m";
+    inline constexpr std::string_view CIANO    = "\x1b[36m";
+    inline constexpr std::string_view AZUL     = "\x1b[34m";
+    inline constexpr std::string_view CINZA    = "\x1b[90m";
+    inline constexpr std::string_view AMARELO  = "\x1b[33m";
+    inline constexpr std::string_view VERMELHO = "\x1b[31m";
+    inline constexpr std::string_view NEGRITO  = "\x1b[1m";
 
-// Verifica se a variavel de ambiente NO_COLOR esta definida com valor nao vazio.
-[[nodiscard]] inline bool has_no_color_env() noexcept {
-#if defined(_WIN32)
-    char buffer[4]{};
-    const DWORD len = GetEnvironmentVariableA("NO_COLOR", buffer, static_cast<DWORD>(sizeof(buffer)));
-    return len > 0;
-#else
-    const char* val = std::getenv("NO_COLOR");
-    return val != nullptr && val[0] != '\0';
-#endif
-}
+}  // namespace Terminal::Cores
 
-// Detecta se stdout e um terminal interativo com suporte a sequencias ANSI.
-[[nodiscard]] inline bool should_use_ansi() noexcept {
-    if (has_no_color_env()) {
-        return false;
+//======================== [ DETECCAO DE AMBIENTE / SO ] =======================
+
+namespace Terminal::Ambiente {
+
+    inline constexpr std::string_view VERSAO = "1.0.0";
+
+    // Retorna o nome do SO detectado em tempo de compilacao.
+    [[nodiscard]] constexpr std::string_view detectarSO() noexcept {
+
+    // Se for Windows...
+    #if defined(_WIN32)
+        return "Windows";
+
+    // Se for Apple ( macOs )...
+    #elif defined(__APPLE__)
+        return "macOS";
+    
+    // Se for Linux...
+    #else
+        return "Linux";
+    #endif
     }
 
-#if defined(_WIN32)
-    if (_isatty(_fileno(stdout)) == 0) {
-        return false;
+    // Verifica se a variavel de ambiente NO_COLOR esta definida com valor nao vazio.
+    [[nodiscard]] inline bool possuiVarSemCor() noexcept {
+    #if defined(_WIN32)
+        char Buffer[4]{};
+        const DWORD TAM = GetEnvironmentVariableA("NO_COLOR", Buffer, static_cast<DWORD>(sizeof(Buffer)));
+        return TAM > 0;
+    #else
+        const char* VALOR = std::getenv("NO_COLOR");
+        return VALOR != nullptr && VALOR[0] != '\0';
+    #endif
     }
-    HANDLE stdout_handle = GetStdHandle(STD_OUTPUT_HANDLE);
-    if (stdout_handle == INVALID_HANDLE_VALUE || stdout_handle == nullptr) {
-        return false;
-    }
-    DWORD mode = 0;
-    if (GetConsoleMode(stdout_handle, &mode) == 0) {
-        return false;
-    }
-    if ((mode & ENABLE_VIRTUAL_TERMINAL_PROCESSING) == 0) {
-        if (SetConsoleMode(stdout_handle, mode | ENABLE_VIRTUAL_TERMINAL_PROCESSING) == 0) {
+
+    // Verifica se STDOUT é um terminal interativo e habilita o processamento VT quando necessario.
+    [[nodiscard]] inline bool configTerminalAnsi() noexcept {
+    #if defined(_WIN32)
+        HANDLE ManipSaida {GetStdHandle(STD_OUTPUT_HANDLE)};
+        if (ManipSaida == INVALID_HANDLE_VALUE || ManipSaida == nullptr) {
             return false;
         }
-    }
-    return true;
-#else
-    return isatty(STDOUT_FILENO) != 0;
-#endif
-}
 
-//============================ [ PALETA / FUNCOES ] ============================
-
-struct Palette {
-    bool enabled = false;
-    std::string_view esc;
-    std::string_view reset;
-    std::string_view green;
-    std::string_view cyan;
-    std::string_view blue;
-    std::string_view gray;
-    std::string_view yellow;
-    std::string_view red;
-    std::string_view bold;
-};
-
-// Retorna a paleta ANSI ativa quando o terminal suporta VT e nao esta redirecionado.
-[[nodiscard]] inline const Palette& palette() noexcept {
-    static const Palette cached = []() {
-        Palette p{};
-        p.enabled = should_use_ansi();
-        if (p.enabled) {
-            p.esc    = "\x1b";
-            p.reset  = "\x1b[0m";
-            p.green  = "\x1b[32m";
-            p.cyan   = "\x1b[36m";
-            p.blue   = "\x1b[34m";
-            p.gray   = "\x1b[90m";
-            p.yellow = "\x1b[33m";
-            p.red    = "\x1b[31m";
-            p.bold   = "\x1b[1m";
+        DWORD Modo = 0;
+        if (GetConsoleMode(ManipSaida, &Modo) == 0) {
+            return false;
         }
-        return p;
-    }();
-    return cached;
-}
 
-// Imprime uma linha em stdout usando std::println quando disponivel no toolchain.
-inline void print_line(std::string_view text = "") {
-#if defined(__cpp_lib_print) && (__cpp_lib_print >= 202207L)
-    std::println("{}", text);
-#else
-    std::cout << text << '\n';
+        if ((Modo & ENABLE_VIRTUAL_TERMINAL_PROCESSING) == 0) {
+            if (SetConsoleMode(ManipSaida, Modo | ENABLE_VIRTUAL_TERMINAL_PROCESSING) == 0) {
+                return false;
+            }
+        }
+        return true;
+    #else
+        return isatty(STDOUT_FILENO) != 0;
+    #endif
+    }
+
+    // Detecta se stdout e um terminal interativo com suporte a sequencias ANSI (com cache estatico).
+    [[nodiscard]] inline bool deveUsarAnsi() noexcept {
+        static const bool SUPORTA_ANSI = !possuiVarSemCor() && configTerminalAnsi();
+        return SUPORTA_ANSI;
+    }
+
+}  // namespace Terminal::Ambiente
+
+//=========================== [ FUNCOES DE SAIDA ] =============================
+
+namespace Terminal::Saida {
+
+    // Imprime uma linha em stdout usando std::println quando disponivel no toolchain.
+    inline void imprimirLinha(std::string_view Texto = "") {
+
+    // Caso o usuário user versões acima ou igual ao C++23...
+    #if defined(__cpp_lib_print) && (__cpp_lib_print >= 202207L) 
+        std::println("{}", Texto);
+
+    // Caso o usuário user versões abaixo do C++23...
+    #else
+        std::cout << Texto << '\n'; 
+
+    #endif
+    }
+
+    // Envolve a mensagem com a cor informada e RESET quando o terminal suportar ANSI.
+    [[nodiscard]] inline std::string colorirTexto(std::string_view Cor, std::string_view Mensagem) {
+        if (!Ambiente::deveUsarAnsi()) {
+            return std::string(Mensagem);
+        }
+
+        std::string Linha;
+        Linha.reserve(Cor.size() + Mensagem.size() + Cores::RESET.size());
+        Linha.append(Cor);
+        Linha.append(Mensagem);
+        Linha.append(Cores::RESET);
+        return Linha;
+    }
+
+    // Imprime uma mensagem colorida seguida de quebra de linha.
+    inline void imprimirColorido(std::string_view Cor, std::string_view Mensagem) {
+        imprimirLinha(colorirTexto(Cor, Mensagem));
+    }
+
+    inline void separador() {
+        imprimirColorido(Cores::CINZA, "----------------------------------------------------");
+    }
+
+    inline void escreveInfo(std::string_view Mensagem) {
+        imprimirColorido(Cores::CIANO, Mensagem);
+    }
+
+    inline void escreveAviso(std::string_view Mensagem) {
+        imprimirColorido(Cores::AMARELO, Mensagem);
+    }
+
+    inline void escreveErro(std::string_view Mensagem) {
+        imprimirColorido(Cores::VERMELHO, Mensagem);
+    }
+
+}  // namespace Terminal::Saida
+
 #endif
-}
-
-inline void print_separator() {
-    const Palette& p = palette();
-    std::string line;
-    line.reserve(p.gray.size() + 52 + p.reset.size());
-    line.append(p.gray);
-    line.append("----------------------------------------------------");
-    line.append(p.reset);
-    print_line(line);
-}
-
-inline void write_colored(std::string_view color, std::string_view message) {
-    const Palette& p = palette();
-    std::string line;
-    line.reserve(color.size() + message.size() + p.reset.size());
-    line.append(color);
-    line.append(message);
-    line.append(p.reset);
-    print_line(line);
-}
-
-inline void write_info(std::string_view message) {
-    write_colored(palette().cyan, message);
-}
-
-inline void write_warn(std::string_view message) {
-    write_colored(palette().yellow, message);
-}
-
-inline void write_error(std::string_view message) {
-    write_colored(palette().red, message);
-}
-
-}  // namespace bootstrap::term
