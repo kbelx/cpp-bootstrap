@@ -61,17 +61,19 @@ struct TestStats {
 bool g_verbose = false;
 
 void print_divider() {
-    const auto& p = bootstrap::term::palette();
-    bootstrap::term::print_line(
-        std::string(p.gray) + "------------------------------------------------------------" + std::string(p.reset)
+    Terminal::Saida::imprimirColorido(
+        Terminal::Cores::CINZA,
+        "------------------------------------------------------------"
     );
 }
 
 void print_section_header(std::string_view title) {
-    const auto& p = bootstrap::term::palette();
-    bootstrap::term::print_line("");
+    Terminal::Saida::imprimirLinha("");
     print_divider();
-    bootstrap::term::print_line(std::string(p.bold) + std::string(p.cyan) + std::string(title) + std::string(p.reset));
+    Terminal::Saida::imprimirColorido(
+        std::string(Terminal::Cores::NEGRITO) + std::string(Terminal::Cores::CIANO),
+        title
+    );
     print_divider();
 }
 
@@ -84,22 +86,24 @@ std::string format_test_number(int n) {
 void invoke_test(TestStats& stats, std::string_view name, const std::function<void()>& assertion) {
     ++stats.total;
     const std::string num = format_test_number(stats.total);
-    const auto& p = bootstrap::term::palette();
 
     try {
         assertion();
         ++stats.passed;
-        bootstrap::term::print_line(
-            "  " + std::string(p.green) + "[PASS]" + std::string(p.reset) + " Teste " + num + ": " + std::string(name)
+        Terminal::Saida::imprimirLinha(
+            "  " + Terminal::Saida::colorirTexto(Terminal::Cores::VERDE, "[PASS]") +
+            " Teste " + num + ": " + std::string(name)
         );
     }
     catch (const std::exception& ex) {
         ++stats.failed;
-        bootstrap::term::print_line(
-            "  " + std::string(p.red) + "[FAIL]" + std::string(p.reset) + " Teste " + num + ": " + std::string(name)
+        Terminal::Saida::imprimirLinha(
+            "  " + Terminal::Saida::colorirTexto(Terminal::Cores::VERMELHO, "[FAIL]") +
+            " Teste " + num + ": " + std::string(name)
         );
-        bootstrap::term::print_line(
-            "         " + std::string(p.red) + "-> Erro:" + std::string(p.reset) + " " + ex.what()
+        Terminal::Saida::imprimirLinha(
+            "         " + Terminal::Saida::colorirTexto(Terminal::Cores::VERMELHO, "-> Erro:") +
+            " " + ex.what()
         );
     }
 }
@@ -108,9 +112,8 @@ void invoke_skip(TestStats& stats, std::string_view name, std::string_view reaso
     ++stats.total;
     ++stats.skipped;
     const std::string num = format_test_number(stats.total);
-    const auto& p = bootstrap::term::palette();
-    bootstrap::term::print_line(
-        "  " + std::string(p.yellow) + "[SKIP]" + std::string(p.reset) +
+    Terminal::Saida::imprimirLinha(
+        "  " + Terminal::Saida::colorirTexto(Terminal::Cores::AMARELO, "[SKIP]") +
         " Teste " + num + ": " + std::string(name) + " (" + std::string(reason) + ")"
     );
 }
@@ -302,10 +305,10 @@ ProcessResult run_process(const std::vector<std::string>& args, const fs::path& 
 
     if (g_verbose) {
         if (!result.stdout_text.empty()) {
-            bootstrap::term::print_line("[STDOUT] " + result.stdout_text);
+            Terminal::Saida::imprimirLinha("[STDOUT] " + result.stdout_text);
         }
         if (!result.stderr_text.empty()) {
-            bootstrap::term::print_line("[STDERR] " + result.stderr_text);
+            Terminal::Saida::imprimirLinha("[STDERR] " + result.stderr_text);
         }
     }
     return result;
@@ -393,10 +396,10 @@ ProcessResult run_process(const std::vector<std::string>& args, const fs::path& 
 
     if (g_verbose) {
         if (!result.stdout_text.empty()) {
-            bootstrap::term::print_line("[STDOUT] " + result.stdout_text);
+            Terminal::Saida::imprimirLinha("[STDOUT] " + result.stdout_text);
         }
         if (!result.stderr_text.empty()) {
-            bootstrap::term::print_line("[STDERR] " + result.stderr_text);
+            Terminal::Saida::imprimirLinha("[STDERR] " + result.stderr_text);
         }
     }
     return result;
@@ -467,7 +470,7 @@ int main(int argc, char* argv[]) {
     }
 
     if (!fs::exists(target_exe)) {
-        bootstrap::term::write_error("[ERRO] Executavel alvo nao encontrado: " + target_exe.string());
+        Terminal::Saida::escreveErro("[ERRO] Executavel alvo nao encontrado: " + target_exe.string());
         return 1;
     }
 
@@ -478,9 +481,9 @@ int main(int argc, char* argv[]) {
     TestStats stats{};
 
     print_section_header("[TEST SUITE] cpp-bootstrap (C++23)");
-    bootstrap::term::print_line("* Executavel alvo  : " + target_exe.string());
-    bootstrap::term::print_line("* Ambiente sandbox : " + temp_root.string());
-    bootstrap::term::print_line("* Sistema          : " + std::string(bootstrap::term::detect_os_label()));
+    Terminal::Saida::imprimirLinha("* Executavel alvo  : " + target_exe.string());
+    Terminal::Saida::imprimirLinha("* Ambiente sandbox : " + temp_root.string());
+    Terminal::Saida::imprimirLinha("* Sistema          : " + std::string(Terminal::Ambiente::detectarSO()));
 
     // -------------------------------------------------------------------------
     // 1. Testes Unitarios (Logica Pura em Memoria)
@@ -494,30 +497,30 @@ int main(int argc, char* argv[]) {
     });
 
     invoke_test(stats, "test_project_name rejeita nomes vazios ou apenas espacos", [&]() {
-        require(!bootstrap::test_project_name("", temp_root, true), "String vazia deveria falhar");
-        require(!bootstrap::test_project_name("   ", temp_root, true), "Apenas espacos deveria falhar");
+        require(!Validadores::test_project_name("", temp_root, true), "String vazia deveria falhar");
+        require(!Validadores::test_project_name("   ", temp_root, true), "Apenas espacos deveria falhar");
     });
 
     invoke_test(stats, "test_project_name rejeita caracteres proibidos e inicio com '-'", [&]() {
-        require(!bootstrap::test_project_name("Projeto<Invalido>", temp_root, true), "< > deveria falhar");
-        require(!bootstrap::test_project_name("dir/sub", temp_root, true), "/ deveria falhar");
-        require(!bootstrap::test_project_name("-iniciadoComTraco", temp_root, true), "Inicio com '-' deveria falhar");
+        require(!Validadores::test_project_name("Projeto<Invalido>", temp_root, true), "< > deveria falhar");
+        require(!Validadores::test_project_name("dir/sub", temp_root, true), "/ deveria falhar");
+        require(!Validadores::test_project_name("-iniciadoComTraco", temp_root, true), "Inicio com '-' deveria falhar");
     });
 
     invoke_test(stats, "test_project_name rejeita espaco interno (protege CMake)", [&]() {
-        require(!bootstrap::test_project_name("Meu Projeto", temp_root, true), "Espaco interno deveria falhar");
+        require(!Validadores::test_project_name("Meu Projeto", temp_root, true), "Espaco interno deveria falhar");
     });
 
     invoke_test(stats, "test_project_name rejeita nome terminando com ponto final", [&]() {
-        require(!bootstrap::test_project_name("ProjetoComPonto.", temp_root, true), "Ponto final deveria falhar");
+        require(!Validadores::test_project_name("ProjetoComPonto.", temp_root, true), "Ponto final deveria falhar");
     });
 
     invoke_test(stats, "test_project_name rejeita nomes reservados do Windows em qualquer SO", [&]() {
-        require(!bootstrap::test_project_name("CON", temp_root, true), "CON deveria falhar");
-        require(!bootstrap::test_project_name("aux", temp_root, true), "aux deveria falhar");
-        require(!bootstrap::test_project_name("NUL.txt", temp_root, true), "NUL.txt deveria falhar");
-        require(!bootstrap::test_project_name("COM1", temp_root, true), "COM1 deveria falhar");
-        require(!bootstrap::test_project_name("LPT9", temp_root, true), "LPT9 deveria falhar");
+        require(!Validadores::test_project_name("CON", temp_root, true), "CON deveria falhar");
+        require(!Validadores::test_project_name("aux", temp_root, true), "aux deveria falhar");
+        require(!Validadores::test_project_name("NUL.txt", temp_root, true), "NUL.txt deveria falhar");
+        require(!Validadores::test_project_name("COM1", temp_root, true), "COM1 deveria falhar");
+        require(!Validadores::test_project_name("LPT9", temp_root, true), "LPT9 deveria falhar");
     });
 
     invoke_test(stats, "parse_cli trata sem args, --help, --version, -q e multiplos tokens", []() {
@@ -557,7 +560,7 @@ int main(int argc, char* argv[]) {
 
         const auto ver_res = invoke_bootstrap(target_exe, {"--version"}, temp_root);
         require(ver_res.exit_code == 0, "--version deveria retornar 0");
-        require(contains(ver_res.stdout_text, std::string(bootstrap::term::kVersion)), "--version sem versao");
+        require(contains(ver_res.stdout_text, std::string(Terminal::Ambiente::VERSAO)), "--version sem versao");
     });
 
     invoke_test(stats, "Entradas invalidas na CLI sao rejeitadas com codigo 2", [&]() {
@@ -837,36 +840,38 @@ int main() {
     }
 
     const auto elapsed = std::chrono::duration<double>(std::chrono::steady_clock::now() - start_tp).count();
-    const auto& p = bootstrap::term::palette();
 
-    bootstrap::term::print_line("");
+    Terminal::Saida::imprimirLinha("");
     print_divider();
-    bootstrap::term::print_line(std::string(p.bold) + "[RESUMO DA EXECUCAO DOS TESTES]" + std::string(p.reset));
+    Terminal::Saida::imprimirColorido(Terminal::Cores::NEGRITO, "[RESUMO DA EXECUCAO DOS TESTES]");
     print_divider();
-    bootstrap::term::print_line("  Total de testes : " + std::to_string(stats.total));
-    bootstrap::term::print_line("  " + std::string(p.green) + "Aprovados       : " + std::to_string(stats.passed) + std::string(p.reset));
-    bootstrap::term::print_line(
-        "  " + std::string(stats.failed > 0 ? p.red : p.gray) + "Falhos          : " + std::to_string(stats.failed) + std::string(p.reset)
+    Terminal::Saida::imprimirLinha("  Total de testes : " + std::to_string(stats.total));
+    Terminal::Saida::imprimirLinha(
+        "  " + Terminal::Saida::colorirTexto(Terminal::Cores::VERDE, "Aprovados       : " + std::to_string(stats.passed))
+    );
+    Terminal::Saida::imprimirLinha(
+        "  " + Terminal::Saida::colorirTexto(
+            stats.failed > 0 ? Terminal::Cores::VERMELHO : Terminal::Cores::CINZA,
+            "Falhos          : " + std::to_string(stats.failed)
+        )
     );
     if (stats.skipped > 0) {
-        bootstrap::term::print_line(
-            "  " + std::string(p.yellow) + "Ignorados       : " + std::to_string(stats.skipped) + std::string(p.reset)
+        Terminal::Saida::imprimirLinha(
+            "  " + Terminal::Saida::colorirTexto(Terminal::Cores::AMARELO, "Ignorados       : " + std::to_string(stats.skipped))
         );
     }
 
     std::ostringstream time_oss;
     time_oss << std::fixed << std::setprecision(2) << elapsed << "s";
-    bootstrap::term::print_line("  Tempo total     : " + time_oss.str());
+    Terminal::Saida::imprimirLinha("  Tempo total     : " + time_oss.str());
     print_divider();
-    bootstrap::term::print_line("");
+    Terminal::Saida::imprimirLinha("");
 
     if (stats.failed > 0) {
-        bootstrap::term::write_error("[FAIL] A suite de testes falhou!");
+        Terminal::Saida::escreveErro("[FAIL] A suite de testes falhou!");
         return 1;
     }
 
-    bootstrap::term::print_line(
-        std::string(p.green) + "[PASS] Todos os testes passaram com sucesso!" + std::string(p.reset)
-    );
+    Terminal::Saida::imprimirColorido(Terminal::Cores::VERDE, "[PASS] Todos os testes passaram com sucesso!");
     return 0;
 }
