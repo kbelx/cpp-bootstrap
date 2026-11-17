@@ -2,19 +2,18 @@
 AUTOR: Bruno Costa
 DATA: 16/11/2026
 PROPOSITO: Validacao de nomes em 5 regras (vazio, ponto final, reservados, CMake e colisao).
-
 */
-
-#include "validator.hpp"
-
-#include "terminal.hpp"
 
 #include <algorithm>
 #include <array>
 #include <system_error>
 #include <vector>
 
-namespace bootstrap {
+#include "validator.hpp"
+#include "terminal.hpp"
+
+
+namespace Validadores {
 
 namespace {
 
@@ -117,9 +116,9 @@ bool test_project_name(
     // 1 - Nome vazio ou apenas espacos
     if (name.empty() || is_all_whitespace(name)) {
         if (!silent) {
-            term::write_error("[ERRO] Nome do projeto vazio.");
-            term::write_info("[INFO] Exemplo (Windows): cpp-bootstrap MeuProjeto");
-            term::write_info("[INFO] Exemplo (Linux/macOS): ./cpp-bootstrap MeuProjeto");
+            Terminal::Saida::escreveErro("[ERRO] Nome do projeto vazio.");
+            Terminal::Saida::escreveInfo("[INFO] Exemplo (Windows): cpp-bootstrap MeuProjeto");
+            Terminal::Saida::escreveInfo("[INFO] Exemplo (Linux/macOS): ./cpp-bootstrap MeuProjeto");
         }
         return false;
     }
@@ -127,10 +126,10 @@ bool test_project_name(
     // 2 - Nome terminando com ponto (invalido no Windows e bloqueado para portabilidade Git)
     if (name.back() == '.') {
         if (!silent) {
-            term::print_separator();
-            term::write_error("[ERRO] Nome invalido: '" + std::string(name) + "'");
-            term::write_warn("Nomes de pasta nao podem terminar com '.' ou espaco.");
-            term::print_separator();
+            Terminal::Saida::separador();
+            Terminal::Saida::escreveErro("[ERRO] Nome invalido: '" + std::string(name) + "'");
+            Terminal::Saida::escreveAviso("Nomes de pasta nao podem terminar com '.' ou espaco.");
+            Terminal::Saida::separador();
         }
         return false;
     }
@@ -138,11 +137,11 @@ bool test_project_name(
     // 3 - Nomes de dispositivos reservados do Windows (bloqueados em todos os SOs para portabilidade)
     if (is_windows_reserved_name(name)) {
         if (!silent) {
-            term::print_separator();
-            term::write_error("[ERRO] Nome invalido: '" + std::string(name) + "'");
-            term::write_warn("Esse e um nome reservado do Windows.");
-            term::write_info("Escolha outro (ex: '" + std::string(name) + "_proj').");
-            term::print_separator();
+            Terminal::Saida::separador();
+            Terminal::Saida::escreveErro("[ERRO] Nome invalido: '" + std::string(name) + "'");
+            Terminal::Saida::escreveAviso("Esse e um nome reservado do Windows.");
+            Terminal::Saida::escreveInfo("Escolha outro (ex: '" + std::string(name) + "_proj').");
+            Terminal::Saida::separador();
         }
         return false;
     }
@@ -162,11 +161,11 @@ bool test_project_name(
     if (!valid_pattern) {
         if (!silent) {
             const std::string bad_display = format_invalid_chars(name);
-            term::print_separator();
-            term::write_error("[ERRO] Nome invalido: '" + std::string(name) + "'");
-            term::write_warn("Caracteres proibidos encontrados: " + bad_display);
-            term::write_info("Use apenas letras, numeros, '_' e '-' (sem espacos e sem iniciar com '-').");
-            term::print_separator();
+            Terminal::Saida::separador();
+            Terminal::Saida::escreveErro("[ERRO] Nome invalido: '" + std::string(name) + "'");
+            Terminal::Saida::escreveAviso("Caracteres proibidos encontrados: " + bad_display);
+            Terminal::Saida::escreveInfo("Use apenas letras, numeros, '_' e '-' (sem espacos e sem iniciar com '-').");
+            Terminal::Saida::separador();
         }
         return false;
     }
@@ -176,12 +175,12 @@ bool test_project_name(
     const std::filesystem::path candidate_path = base_dir / std::filesystem::path(name);
     if (std::filesystem::exists(candidate_path, ec)) {
         if (!silent) {
-            term::print_separator();
-            term::write_error("[ERRO] Ja existe uma pasta ou arquivo com o nome: '" + std::string(name) + "'");
-            term::write_info("Sugestoes:");
-            term::write_info("  * Use outro nome: cpp-bootstrap " + std::string(name) + "_2");
-            term::write_info("  * Ou renomeie/apague o item existente.");
-            term::print_separator();
+            Terminal::Saida::separador();
+            Terminal::Saida::escreveErro("[ERRO] Ja existe uma pasta ou arquivo com o nome: '" + std::string(name) + "'");
+            Terminal::Saida::escreveInfo("Sugestoes:");
+            Terminal::Saida::escreveInfo("  * Use outro nome: cpp-bootstrap " + std::string(name) + "_2");
+            Terminal::Saida::escreveInfo("  * Ou renomeie/apague o item existente.");
+            Terminal::Saida::separador();
         }
         return false;
     }

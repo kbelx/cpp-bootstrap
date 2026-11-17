@@ -2,71 +2,85 @@
 AUTOR: Bruno Costa
 DATA: 16/11/2026
 PROPOSITO: Ponto de entrada da CLI cpp-bootstrap, orquestracao do fluxo e banner de sucesso.
-
 */
+
+#include <filesystem>
+#include <string>
+#include <string_view>
 
 #include "cli.hpp"
 #include "generator.hpp"
 #include "terminal.hpp"
 #include "validator.hpp"
 
-#include <filesystem>
-#include <string>
-#include <string_view>
 
 namespace {
 
-//============================= [ MENSAGEM FINAL ] =============================
-
+// Exibe a mensagem final de sucesso
 void print_success_banner(std::string_view project_name, bool quiet) {
-    const bootstrap::term::Palette& p = bootstrap::term::palette();
-
-    auto wrap = [](std::string_view color, std::string_view text, std::string_view reset) {
-        return std::string(color) + std::string(text) + std::string(reset);
-    };
-
-    bootstrap::term::print_line("");
-    bootstrap::term::print_separator(); 
-    bootstrap::term::print_line(
-        "[OK] Projeto " + wrap(p.green, "'" + std::string(project_name) + "'", p.reset) + " criado com sucesso!"
+    Terminal::Saida::imprimirLinha("");
+    Terminal::Saida::separador();
+    Terminal::Saida::imprimirLinha(
+        "[OK] Projeto " +
+        Terminal::Saida::colorirTexto(Terminal::Cores::VERDE, "'" + std::string(project_name) + "'") +
+        " criado com sucesso!"
     );
-    bootstrap::term::print_line("");
-    bootstrap::term::print_line(wrap(p.cyan, "Proximos passos:", p.reset));
-    bootstrap::term::print_line("  1 - Entre na pasta:   " + wrap(p.blue, "cd " + std::string(project_name), p.reset));
-    bootstrap::term::print_line("  2 - Abra no VS Code:  " + wrap(p.blue, "code .", p.reset));
-    bootstrap::term::print_line("  3 - Configure CMake:  " + wrap(p.blue, "cmake -B build", p.reset));
-    bootstrap::term::print_line("  4 - Compile:          " + wrap(p.blue, "cmake --build build", p.reset));
-    bootstrap::term::print_line("");
-    bootstrap::term::print_line(
-        wrap(p.cyan, "Sistema detectado:", p.reset) + " " + std::string(bootstrap::term::detect_os_label())
+    Terminal::Saida::imprimirLinha("");
+    Terminal::Saida::imprimirColorido(Terminal::Cores::CIANO, "Proximos passos:");
+    Terminal::Saida::imprimirLinha(
+        "  1 - Entre na pasta:   " +
+        Terminal::Saida::colorirTexto(Terminal::Cores::AZUL, "cd " + std::string(project_name))
+    );
+    Terminal::Saida::imprimirLinha(
+        "  2 - Abra no VS Code:  " +
+        Terminal::Saida::colorirTexto(Terminal::Cores::AZUL, "code .")
+    );
+    Terminal::Saida::imprimirLinha(
+        "  3 - Configure CMake:  " +
+        Terminal::Saida::colorirTexto(Terminal::Cores::AZUL, "cmake -B build")
+    );
+    Terminal::Saida::imprimirLinha(
+        "  4 - Compile:          " +
+        Terminal::Saida::colorirTexto(Terminal::Cores::AZUL, "cmake --build build")
+    );
+    Terminal::Saida::imprimirLinha("");
+    Terminal::Saida::imprimirLinha(
+        Terminal::Saida::colorirTexto(Terminal::Cores::CIANO, "Sistema detectado:") +
+        " " +
+        std::string(Terminal::Ambiente::detectarSO())
     );
 
     if (!quiet) {
-        bootstrap::term::print_separator();
-        bootstrap::term::print_line(
-            wrap(p.cyan, "Autor:", p.reset) + " Bruno Costa (" + wrap(p.blue, "aka kbelx", p.reset) + ")"
+        Terminal::Saida::separador();
+        Terminal::Saida::imprimirLinha(
+            Terminal::Saida::colorirTexto(Terminal::Cores::CIANO, "Autor:") +
+            " Bruno Costa (" +
+            Terminal::Saida::colorirTexto(Terminal::Cores::AZUL, "aka kbelx") +
+            ")"
         );
 
         constexpr std::string_view kGithubUrl   = "https://github.com/kbelx";
         constexpr std::string_view kLinkedinUrl = "https://www.linkedin.com/in/brunocosta-dev/";
 
-        if (p.enabled) {
-            auto osc8_link = [&](std::string_view url) {
-                return std::string(p.esc) + "]8;;" + std::string(url) + std::string(p.esc) + "\\" +
-                       wrap(p.blue, url, p.reset) +
-                       std::string(p.esc) + "]8;;" + std::string(p.esc) + "\\";
+        if (Terminal::Ambiente::deveUsarAnsi()) {
+            auto osc8_link = [](std::string_view url) {
+                return std::string(Terminal::Cores::ESC) + "]8;;" + std::string(url) +
+                       std::string(Terminal::Cores::ESC) + "\\" +
+                       Terminal::Saida::colorirTexto(Terminal::Cores::AZUL, url) +
+                       std::string(Terminal::Cores::ESC) + "]8;;" +
+                       std::string(Terminal::Cores::ESC) + "\\";
             };
-            bootstrap::term::print_line("  GitHub:   " + osc8_link(kGithubUrl));
-            bootstrap::term::print_line("  LinkedIn: " + osc8_link(kLinkedinUrl));
+            Terminal::Saida::imprimirLinha("  GitHub:   " + osc8_link(kGithubUrl));
+            Terminal::Saida::imprimirLinha("  LinkedIn: " + osc8_link(kLinkedinUrl));
         }
         else {
-            bootstrap::term::print_line("  GitHub:   " + std::string(kGithubUrl));
-            bootstrap::term::print_line("  LinkedIn: " + std::string(kLinkedinUrl));
+            Terminal::Saida::imprimirLinha("  GitHub:   " + std::string(kGithubUrl));
+            Terminal::Saida::imprimirLinha("  LinkedIn: " + std::string(kLinkedinUrl));
         }
     }
 
-    bootstrap::term::print_separator();
-    bootstrap::term::print_line("");
+    Terminal::Saida::separador();
+    Terminal::Saida::imprimirLinha("");
 }
 
 }  // namespace
@@ -88,10 +102,10 @@ int main(int argc, char* argv[]) {
             return 0;
 
         case bootstrap::CliAction::InvalidFlag:
-            bootstrap::term::print_separator();
-            bootstrap::term::write_error("[ERRO] Opcao desconhecida: '" + options.unknown_flag + "'");
-            bootstrap::term::write_info("Use --help para ver as opcoes disponiveis.");
-            bootstrap::term::print_separator();
+            Terminal::Saida::separador();
+            Terminal::Saida::escreveErro("[ERRO] Opcao desconhecida: '" + options.unknown_flag + "'");
+            Terminal::Saida::escreveInfo("Use --help para ver as opcoes disponiveis.");
+            Terminal::Saida::separador();
             return 2;
 
         case bootstrap::CliAction::CreateProject:
@@ -100,17 +114,17 @@ int main(int argc, char* argv[]) {
 
     const std::filesystem::path caller_dir = std::filesystem::current_path();
 
-    if (!bootstrap::test_project_name(options.project_name, caller_dir)) {
+    if (!Validadores::test_project_name(options.project_name, caller_dir)) {
         return 2;
     }
 
     std::string error_detail;
     if (!bootstrap::create_project(caller_dir, options.project_name, &error_detail)) {
-        bootstrap::term::print_line("");
-        bootstrap::term::print_separator();
-        bootstrap::term::write_error("[ERRO] Falha ao criar o projeto '" + options.project_name + "'");
-        bootstrap::term::write_warn("Detalhe: " + error_detail);
-        bootstrap::term::print_separator();
+        Terminal::Saida::imprimirLinha("");
+        Terminal::Saida::separador();
+        Terminal::Saida::escreveErro("[ERRO] Falha ao criar o projeto '" + options.project_name + "'");
+        Terminal::Saida::escreveAviso("Detalhe: " + error_detail);
+        Terminal::Saida::separador();
         return 10;
     }
 

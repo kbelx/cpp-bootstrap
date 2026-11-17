@@ -10,7 +10,7 @@ PROPOSITO: Declaracao da funcao de validacao multiplataforma de nomes de projeto
     #include <filesystem>
     #include <string_view>
 
-    namespace bootstrap {
+    namespace Validadores {
 
     // Valida o nome do projeto segundo regras uniformes multiplataforma e CMake.
     // Emite diagnosticos no terminal (quando silent == false) e retorna false em caso de erro.

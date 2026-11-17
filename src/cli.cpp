@@ -2,11 +2,9 @@
 AUTOR: Bruno Costa
 DATA: 16/11/2026
 PROPOSITO: Implementacao do parser de linha de comando, trim do nome e telas de tutorial/ajuda.
-
 */
 
 #include "cli.hpp"
-
 #include "terminal.hpp"
 
 #include <vector>
@@ -117,43 +115,44 @@ CliOptions parse_cli(int argc, const char* const* argv) {
 //============================== [ TUTORIAL ] ==================================
 
 void print_tutorial() {
-    term::print_separator();
-    term::print_line("Uso:");
+    Terminal::Saida::separador();
+    Terminal::Saida::imprimirLinha("Uso:");
 
 #if defined(_WIN32)
-    term::print_line("  cpp-bootstrap NomeDoProjeto");
+    Terminal::Saida::imprimirLinha("  cpp-bootstrap NomeDoProjeto");
 #else
-    term::print_line("  ./cpp-bootstrap NomeDoProjeto");
+    Terminal::Saida::imprimirLinha("  ./cpp-bootstrap NomeDoProjeto");
 #endif
 
-    term::print_line("");
-    term::print_line("Dica: use apenas o nome real do projeto, sem < > ou espacos.");
-    term::print_separator();
+    Terminal::Saida::imprimirLinha("");
+    Terminal::Saida::imprimirLinha("Dica: use apenas o nome real do projeto, sem < > ou espacos.");
+    Terminal::Saida::separador();
 }
 
 void print_help() {
-    const term::Palette& p = term::palette();
-
-    term::print_separator();
-    term::print_line(std::string(p.cyan) + "cpp-bootstrap v" + std::string(term::kVersion) + std::string(p.reset));
-    term::print_line("Gerador de projetos C++23 com estrutura padrao, CMake e VS Code.");
-    term::print_line("");
-    term::print_line("Uso:");
-    term::print_line("  cpp-bootstrap <NomeDoProjeto> [opcoes]");
-    term::print_line("");
-    term::print_line("Opcoes:");
-    term::print_line("  -q, --quiet      Suprime o rodape de autoria e links");
-    term::print_line("  -h, --help       Exibe esta mensagem de ajuda");
-    term::print_line("  -v, --version    Exibe a versao do programa");
-    term::print_line("");
-    term::print_line("Regras para NomeDoProjeto:");
-    term::print_line("  * Apenas letras ASCII, numeros, '_' e '-'");
-    term::print_line("  * Sem espacos e sem iniciar com '-'");
-    term::print_separator();
+    Terminal::Saida::separador();
+    Terminal::Saida::imprimirColorido(
+        Terminal::Cores::CIANO,
+        "cpp-bootstrap v" + std::string(Terminal::Ambiente::VERSAO)
+    );
+    Terminal::Saida::imprimirLinha("Gerador de projetos C++23 com estrutura padrao, CMake e VS Code.");
+    Terminal::Saida::imprimirLinha("");
+    Terminal::Saida::imprimirLinha("Uso:");
+    Terminal::Saida::imprimirLinha("  cpp-bootstrap <NomeDoProjeto> [opcoes]");
+    Terminal::Saida::imprimirLinha("");
+    Terminal::Saida::imprimirLinha("Opcoes:");
+    Terminal::Saida::imprimirLinha("  -q, --quiet      Suprime o rodape de autoria e links");
+    Terminal::Saida::imprimirLinha("  -h, --help       Exibe esta mensagem de ajuda");
+    Terminal::Saida::imprimirLinha("  -v, --version    Exibe a versao do programa");
+    Terminal::Saida::imprimirLinha("");
+    Terminal::Saida::imprimirLinha("Regras para NomeDoProjeto:");
+    Terminal::Saida::imprimirLinha("  * Apenas letras ASCII, numeros, '_' e '-'");
+    Terminal::Saida::imprimirLinha("  * Sem espacos e sem iniciar com '-'");
+    Terminal::Saida::separador();
 }
 
 void print_version() {
-    term::print_line("cpp-bootstrap " + std::string(term::kVersion));
+    Terminal::Saida::imprimirLinha("cpp-bootstrap " + std::string(Terminal::Ambiente::VERSAO));
 }
 
 }  // namespace bootstrap
