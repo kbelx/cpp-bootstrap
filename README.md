@@ -8,6 +8,7 @@ Ferramenta CLI nativa em **C++23** para criar projetos **C++23 + CMake** com est
 | Info | Descrição |
 | :--- | :--- |
 | Autoria | Bruno Costa ([@kbelx](https://github.com/kbelx)) |
+| Licença | [MIT](LICENSE) ([Português-BR](LICENSE.pt-BR.md)) |
 | Padrão | C++23 estrito (`CMAKE_CXX_STANDARD_REQUIRED ON`) |
 | Build System | CMake (`>= 3.20`) |
 | Alvos dos Templates | **Windows:** GCC/GDB (MSYS2 UCRT64) ou MSVC • **Linux:** GCC/Clang + GDB • **macOS:** Clang/GCC + LLDB |
@@ -156,3 +157,10 @@ ctest --test-dir build -C Release --output-on-failure
 ### GitHub Actions
 - **CI (`ci.yml`):** roda build e os 20 testes em **Ubuntu 24.04 (GCC 14)**, **Windows (MSVC)**, **Windows (MSYS2 UCRT64 GCC)** e **macOS 15 (Clang)**.
 - **Releases (`release.yml`):** ao enviar uma tag `v*`, gera e publica os pacotes `.zip` e `.tar.gz` em **GitHub Releases**.
+
+---
+
+## 6. Licença e Contribuições
+
+- **Licença:** distribuído sob a **Licença MIT** — você pode usar, copiar, modificar e distribuir livremente. Consulte [`LICENSE`](LICENSE) (inglês, oficial) ou [`LICENSE.pt-BR.md`](LICENSE.pt-BR.md) (tradução em português).
+- **Contribuições:** este projeto não aceita Pull Requests ou contribuidores externos, mas **Issues** (bugs, feedback e sugestões) são muito bem-vindas. Veja [`CONTRIBUTING.md`](CONTRIBUTING.md).
