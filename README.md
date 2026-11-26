@@ -2,7 +2,7 @@
 
 Ferramenta CLI nativa em **C++23** para criar projetos **C++23 + CMake** com estrutura padronizada, rollback transacional (RAII) e suporte pronto ao **VS Code** (Windows, Linux e macOS).
 
-> - Protótipo legado em PowerShell congelado na tag [`v0.9.0-beta`](../../tree/v0.9.0-beta) (`legacy/powershell-beta`).
+> - Protótipo legado em PowerShell congelado na tag [`v0.9.0-beta`](../../tree/v0.9.0-beta) (`legacy`).
 > - A partir da **`v1.0.0`**, o binário é nativo em C++23 sem dependências de runtime externas.
 
 | Info | Descrição |

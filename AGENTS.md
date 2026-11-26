@@ -4,7 +4,7 @@
 
 Este projeto se chama **C++ Bootstrap**. É um gerador CLI escrito em **C++23** para inicialização rápida de estruturas de diretórios e arquivos de configuração para **novos projetos C++23 com CMake**.
 
-As versões em PowerShell permanecem **EM LEGADO** (_ou seja, estão CONGELADAS_) na branch `legacy/powershell-beta`. A partir da `v1.0.0`, o código principal da branch `main` **é inteiramente em C++23**.
+As versões em PowerShell permanecem **EM LEGADO** (_ou seja, estão CONGELADAS_) na branch `legacy`. A partir da `v1.0.0`, o código principal da branch `main` **é inteiramente em C++23**.
 
 ---
 
