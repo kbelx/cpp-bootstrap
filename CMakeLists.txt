@@ -42,6 +42,15 @@ add_library(cpp_bootstrap_core OBJECT
 add_executable(${PROJECT_NAME} src/main.cpp)
 target_link_libraries(${PROJECT_NAME} PRIVATE cpp_bootstrap_core)
 
+if(WIN32)
+    configure_file(
+        "${CMAKE_CURRENT_SOURCE_DIR}/resources/app.rc.in"
+        "${CMAKE_CURRENT_BINARY_DIR}/app.rc"
+        @ONLY
+    )
+    target_sources(${PROJECT_NAME} PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/app.rc")
+endif()
+
 if(MINGW AND CPP_BOOTSTRAP_STATIC_RUNTIME)
     target_link_options(${PROJECT_NAME} PRIVATE
         -static
