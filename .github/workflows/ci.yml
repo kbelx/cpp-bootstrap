@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - main
-      - transition/cpp23
+      - dev
   pull_request:
     branches:
       - main
