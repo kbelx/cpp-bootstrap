@@ -187,11 +187,8 @@ namespace Validadores::Diagnostico {
 
 namespace Validadores {
 
-    bool validarNomeProjeto(
-        std::string_view Nome,
-        const std::filesystem::path& DirBase,
-        bool Silencioso
-    ) {
+    bool validarNomeProjeto(std::string_view Nome, const std::filesystem::path& DirBase, bool Silencioso) {
+        
         // 1 - Nome vazio ou apenas espacos
         if (Nome.empty() || Caracteres::apenasEspacos(Nome)) {
             if (!Silencioso) {

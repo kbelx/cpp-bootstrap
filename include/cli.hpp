@@ -16,7 +16,7 @@ PROPOSITO: Declaracoes de opcoes da CLI, normalizacao de nome e exibicao de ajud
 
 namespace CLI {
 
-    inline constexpr std::string_view VERSAO{"1.0.0"};
+    inline constexpr std::string_view VERSAO {"1.0.0"};
 
     enum class Acao {
         CRIAR_PROJETO,
@@ -27,7 +27,7 @@ namespace CLI {
     };
 
     struct Opcoes {
-        Acao AcaoEscolhida{Acao::EXIBIR_ERRO_TUTORIAL};
+        Acao AcaoEscolhida { Acao::EXIBIR_ERRO_TUTORIAL };
         std::string NomeProjeto{};
         std::string FlagDesconhecida{};
         bool Silencioso{false};

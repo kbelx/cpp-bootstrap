@@ -11,6 +11,7 @@ PROPOSITO: Implementacao do parser de linha de comando, limpeza do nome e telas 
 //=========================== [ CABECALHOS DO PROJETO ] ========================
 
 #include "cli.hpp"
+#include "cores.hpp"
 #include "terminal.hpp"
 
 //======================== [ AUXILIARES DE TEXTO / FLAGS ] =====================
@@ -33,9 +34,15 @@ Regras para NomeDoProjeto:
 
 namespace CLI::Auxiliar {
 
+    // Retorna true se Caractere for um espaco em branco ASCII (listados abaixo)
+    // ou false para qualquer outro caractere.
     [[nodiscard]] constexpr bool ehEspacoAscii(char Caractere) noexcept {
-        return Caractere == ' '  || Caractere == '\t' || Caractere == '\n' ||
-               Caractere == '\r' || Caractere == '\v' || Caractere == '\f';
+        return Caractere == ' '  ||     // Espaco simples (0x20)
+               Caractere == '\t' ||     // Tabulacao horizontal / HT (0x09)
+               Caractere == '\n' ||     // Quebra de linha / LF (0x0A)
+               Caractere == '\r' ||     // Retorno de carro / CR (0x0D)
+               Caractere == '\v' ||     // Tabulacao vertical / VT (0x0B)
+               Caractere == '\f';       // Avanco de pagina / FF (0x0C)
     }
 
     [[nodiscard]] std::string_view removerEspacosExternos(std::string_view Texto) noexcept {
@@ -154,23 +161,24 @@ namespace CLI::Telas {
         Terminal::Saida::imprimirLinha("Uso:");
 
     // se o usuario estiver usando Windows...
-    #if defined(_WIN32)
-        Terminal::Saida::imprimirLinha("  cpp-bootstrap NomeDoProjeto");
+        #if defined(_WIN32)
+            Terminal::Saida::imprimirLinha("    cpp-bootstrap NomeDoProjeto");
 
     // se o usuario estiver usando linux/macOs...
-    #else
-        Terminal::Saida::imprimirLinha("  ./cpp-bootstrap NomeDoProjeto");
-    #endif
+        #else
+            Terminal::Saida::imprimirLinha("    ./cpp-bootstrap NomeDoProjeto");
+        #endif
 
         Terminal::Saida::imprimirLinha("");
-        Terminal::Saida::imprimirLinha("Dica: use apenas o nome real do projeto, sem < > ou espacos.");
+        Terminal::Saida::imprimirLinha("Dica:");
+        Terminal::Saida::imprimirLinha("    use apenas o nome real do projeto, sem < > ou espacos.");
         Terminal::Saida::separador();
     }
 
     void exibirAjuda() {
         Terminal::Saida::separador();
         Terminal::Saida::imprimirColorido(
-            Terminal::Cores::CIANO,
+            Cores::CIANO,
             "cpp-bootstrap v" + std::string{CLI::VERSAO}
         );
         Terminal::Saida::imprimirLinha(CORPO_AJUDA);

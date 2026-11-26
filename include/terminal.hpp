@@ -43,21 +43,9 @@ PROPOSITO: Deteccao de SO, suporte ANSI/VT e utilitarios de saida formatada no t
     #include <unistd.h>   // isatty, STDOUT_FILENO (POSIX: Linux / macOS)
 #endif
 
-//============================ [ PALETA DE CORES ] =============================
+//=========================== [ CABECALHOS DO PROJETO ] ========================
 
-namespace Terminal::Cores {
-
-    inline constexpr std::string_view ESC{"\x1b"};
-    inline constexpr std::string_view RESET{"\x1b[0m"};
-    inline constexpr std::string_view VERDE{"\x1b[32m"};
-    inline constexpr std::string_view CIANO{"\x1b[36m"};
-    inline constexpr std::string_view AZUL{"\x1b[34m"};
-    inline constexpr std::string_view CINZA{"\x1b[90m"};
-    inline constexpr std::string_view AMARELO{"\x1b[33m"};
-    inline constexpr std::string_view VERMELHO{"\x1b[31m"};
-    inline constexpr std::string_view NEGRITO{"\x1b[1m"};
-
-}  // namespace Terminal::Cores
+#include "cores.hpp"
 
 //======================== [ DETECCAO DE AMBIENTE / SO ] =======================
 
@@ -66,57 +54,58 @@ namespace Terminal::Ambiente {
     // Retorna o nome do SO detectado em tempo de compilacao.
     [[nodiscard]] constexpr std::string_view detectarSO() noexcept {
 
-    // Se for Windows...
-    #if defined(_WIN32)
-        return "Windows";
+        // Se for Windows...
+        #if defined(_WIN32)
+            return "Windows";
 
-    // Se for Apple ( macOs )...
-    #elif defined(__APPLE__)
-        return "macOS";
+        // Se for Apple ( macOs )...
+        #elif defined(__APPLE__)
+            return "macOS";
 
-    // Se for Linux...
-    #else
-        return "Linux";
-    #endif
+        // Se for Linux...
+        #else
+            return "Linux";
+        #endif
     }
 
     // Verifica se a variavel de ambiente NO_COLOR esta definida com valor nao vazio.
     [[nodiscard]] inline bool possuiVarSemCor() noexcept {
-    #if defined(_WIN32)
-        char Buffer[4]{};
-        const DWORD TAM{GetEnvironmentVariableA("NO_COLOR", Buffer, static_cast<DWORD>(sizeof(Buffer)))};
-        return TAM > 0;
-    #else
-        const char* VALOR{std::getenv("NO_COLOR")};
-        return VALOR != nullptr && VALOR[0] != '\0';
-    #endif
+        #if defined(_WIN32)
+            char Buffer[4]{};
+            const DWORD TAM{GetEnvironmentVariableA("NO_COLOR", Buffer, static_cast<DWORD>(sizeof(Buffer)))};
+            return TAM > 0;
+            
+        #else
+            const char* VALOR{std::getenv("NO_COLOR")};
+            return VALOR != nullptr && VALOR[0] != '\0';
+        #endif
     }
 
     // Verifica se STDOUT e um terminal interativo e habilita o processamento VT quando necessario.
     [[nodiscard]] inline bool configTerminalAnsi() noexcept {
-    #if defined(_WIN32)
-        HANDLE ManipSaida{GetStdHandle(STD_OUTPUT_HANDLE)};
-        if (ManipSaida == INVALID_HANDLE_VALUE || ManipSaida == nullptr) {
-            return false;
-        }
-
-        DWORD Modo{0};
-        if (GetConsoleMode(ManipSaida, &Modo) == 0) {
-            return false;
-        }
-
-        if ((Modo & ENABLE_VIRTUAL_TERMINAL_PROCESSING) == 0) {
-            if (SetConsoleMode(ManipSaida, Modo | ENABLE_VIRTUAL_TERMINAL_PROCESSING) == 0) {
+        #if defined(_WIN32)
+            HANDLE ManipSaida{GetStdHandle(STD_OUTPUT_HANDLE)};
+            if (ManipSaida == INVALID_HANDLE_VALUE || ManipSaida == nullptr) {
                 return false;
             }
-        }
-        return true;
-    #else
-        return isatty(STDOUT_FILENO) != 0;
-    #endif
+
+            DWORD Modo{0};
+            if (GetConsoleMode(ManipSaida, &Modo) == 0) {
+                return false;
+            }
+
+            if ((Modo & ENABLE_VIRTUAL_TERMINAL_PROCESSING) == 0) {
+                if (SetConsoleMode(ManipSaida, Modo | ENABLE_VIRTUAL_TERMINAL_PROCESSING) == 0) {
+                    return false;
+                }
+            }
+            return true;
+        #else
+            return isatty(STDOUT_FILENO) != 0;
+        #endif
     }
 
-    // Detecta se stdout e um terminal interativo com suporte a sequencias ANSI (com cache estatico).
+    // Detecta se STDOUT e um terminal interativo com suporte a sequencias ANSI (com cache estatico).
     [[nodiscard]] inline bool deveUsarAnsi() noexcept {
         static const bool SUPORTA_ANSI{!possuiVarSemCor() && configTerminalAnsi()};
         return SUPORTA_ANSI;
@@ -128,37 +117,54 @@ namespace Terminal::Ambiente {
 
 namespace Terminal::Saida {
 
-    // Imprime uma linha em stdout usando std::println quando disponivel no toolchain.
+    /*
+    Autor do Comentario: Bruno Costa
+
+    Data: 19/11/2026
+
+    Explicacao: 
+    Imprime uma linha em STDOUT usando std::println quando disponivel no toolchain.
+    
+    tive que fazer isso, pois no atual momento, muitos compiladores
+    tem a biblioteca padrao INCOMPLETA para o cabecalho <print>.
+
+    Ate onde sei, AppleClang (macOs) e GCC 13 (Ubuntu 24.04)
+
+    */
     inline void imprimirLinha(std::string_view Texto = "") {
+        #if defined(__cpp_lib_print) && (__cpp_lib_print >= 202207L)
+            std::println("{}", Texto);
 
-    // Caso o usuario use versoes acima ou igual ao C++23...
-    #if defined(__cpp_lib_print) && (__cpp_lib_print >= 202207L)
-        std::println("{}", Texto);
+        #else
+            std::cout << Texto << '\n';
 
-    // Caso o usuario use versoes abaixo do C++23...
-    #else
-        std::cout << Texto << '\n';
-
-    #endif
+        #endif
     }
 
     // Envolve a mensagem com a cor informada e RESET quando o terminal suportar ANSI.
-    [[nodiscard]] inline std::string colorirTexto(std::string_view Cor, std::string_view Mensagem) {
+    [[nodiscard]] inline std::string colorirTexto(std::string_view Cor_1, std::string_view Mensagem) { 
+        
         if (!Ambiente::deveUsarAnsi()) {
             return std::string{Mensagem};
         }
 
         std::string Linha{};
-        Linha.reserve(Cor.size() + Mensagem.size() + Cores::RESET.size());
-        Linha.append(Cor);
+        Linha.reserve(Cor_1.size() + Mensagem.size() + Cores::RESET.size());
+        Linha.append(Cor_1);
         Linha.append(Mensagem);
         Linha.append(Cores::RESET);
         return Linha;
     }
 
     // Imprime uma mensagem colorida seguida de quebra de linha.
-    inline void imprimirColorido(std::string_view Cor, std::string_view Mensagem) {
-        imprimirLinha(colorirTexto(Cor, Mensagem));
+    inline void imprimirColorido(std::string_view Cor_1, std::string_view Mensagem) {
+        #if(1)
+            imprimirLinha(colorirTexto(Cor_1, Mensagem));
+        #endif
+
+        #if(0)
+            
+        #endif
     }
 
     inline void separador() {

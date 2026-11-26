@@ -23,6 +23,7 @@ PROPOSITO: Infraestrutura base da suite de testes (estatisticas, assercoes e san
 
 //=========================== [ CABECALHOS DO PROJETO ] ========================
 
+#include "cores.hpp"
 #include "terminal.hpp"
 
 //======================== [ INFRAESTRUTURA DE TESTES ] ========================
@@ -40,7 +41,7 @@ namespace Testes::Infra {
 
     inline void imprimirDivisor() {
         Terminal::Saida::imprimirColorido(
-            Terminal::Cores::CINZA,
+            Cores::CINZA,
             "------------------------------------------------------------"
         );
     }
@@ -49,7 +50,7 @@ namespace Testes::Infra {
         Terminal::Saida::imprimirLinha("");
         imprimirDivisor();
         Terminal::Saida::imprimirColorido(
-            std::string{Terminal::Cores::NEGRITO} + std::string{Terminal::Cores::CIANO},
+            std::string{Cores::NEGRITO} + std::string{Cores::CIANO},
             Titulo
         );
         imprimirDivisor();
@@ -73,18 +74,18 @@ namespace Testes::Infra {
             Assercao();
             ++Est.Aprovados;
             Terminal::Saida::imprimirLinha(
-                "  " + Terminal::Saida::colorirTexto(Terminal::Cores::VERDE, "[PASS]") +
+                "  " + Terminal::Saida::colorirTexto(Cores::VERDE, "[PASS]") +
                 " Teste " + NUM + ": " + std::string{Nome}
             );
         }
         catch (const std::exception& EXCECAO) {
             ++Est.Falhos;
             Terminal::Saida::imprimirLinha(
-                "  " + Terminal::Saida::colorirTexto(Terminal::Cores::VERMELHO, "[FAIL]") +
+                "  " + Terminal::Saida::colorirTexto(Cores::VERMELHO, "[FAIL]") +
                 " Teste " + NUM + ": " + std::string{Nome}
             );
             Terminal::Saida::imprimirLinha(
-                "         " + Terminal::Saida::colorirTexto(Terminal::Cores::VERMELHO, "-> Erro:") +
+                "         " + Terminal::Saida::colorirTexto(Cores::VERMELHO, "-> Erro:") +
                 " " + EXCECAO.what()
             );
         }
@@ -99,7 +100,7 @@ namespace Testes::Infra {
         ++Est.Ignorados;
         const std::string NUM{formatarNumeroTeste(Est.Total)};
         Terminal::Saida::imprimirLinha(
-            "  " + Terminal::Saida::colorirTexto(Terminal::Cores::AMARELO, "[SKIP]") +
+            "  " + Terminal::Saida::colorirTexto(Cores::AMARELO, "[SKIP]") +
             " Teste " + NUM + ": " + std::string{Nome} + " (" + std::string{Motivo} + ")"
         );
     }
@@ -117,25 +118,25 @@ namespace Testes::Infra {
     [[nodiscard]] inline int exibirResumoFinal(const Estatisticas& Est, double SegundosDecorridos) {
         Terminal::Saida::imprimirLinha("");
         imprimirDivisor();
-        Terminal::Saida::imprimirColorido(Terminal::Cores::NEGRITO, "[RESUMO DA EXECUCAO DOS TESTES]");
+        Terminal::Saida::imprimirColorido(Cores::NEGRITO, "[RESUMO DA EXECUCAO DOS TESTES]");
         imprimirDivisor();
         Terminal::Saida::imprimirLinha("  Total de testes : " + std::to_string(Est.Total));
         Terminal::Saida::imprimirLinha(
             "  " + Terminal::Saida::colorirTexto(
-                Terminal::Cores::VERDE,
+                Cores::VERDE,
                 "Aprovados       : " + std::to_string(Est.Aprovados)
             )
         );
         Terminal::Saida::imprimirLinha(
             "  " + Terminal::Saida::colorirTexto(
-                Est.Falhos > 0 ? Terminal::Cores::VERMELHO : Terminal::Cores::CINZA,
+                Est.Falhos > 0 ? Cores::VERMELHO : Cores::CINZA,
                 "Falhos          : " + std::to_string(Est.Falhos)
             )
         );
         if (Est.Ignorados > 0) {
             Terminal::Saida::imprimirLinha(
                 "  " + Terminal::Saida::colorirTexto(
-                    Terminal::Cores::AMARELO,
+                    Cores::AMARELO,
                     "Ignorados       : " + std::to_string(Est.Ignorados)
                 )
             );
@@ -153,7 +154,7 @@ namespace Testes::Infra {
         }
 
         Terminal::Saida::imprimirColorido(
-            Terminal::Cores::VERDE,
+            Cores::VERDE,
             "[PASS] Todos os testes passaram com sucesso!"
         );
         return 0;

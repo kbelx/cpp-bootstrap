@@ -99,10 +99,7 @@ namespace Gerador::Projeto {
         std::filesystem::create_directory(RaizProjeto / ".vscode");
     }
 
-    void gerarArquivosPadrao(
-        const std::filesystem::path& RaizProjeto,
-        std::string_view NomeProjeto
-    ) {
+    void gerarArquivosPadrao(const std::filesystem::path& RaizProjeto, std::string_view NomeProjeto) {
         const std::filesystem::path DIR_SRC{RaizProjeto / "src"};
         const std::filesystem::path DIR_VSCODE{RaizProjeto / ".vscode"};
 
@@ -116,11 +113,7 @@ namespace Gerador::Projeto {
         Arquivo::gravarUtf8SemBom(RaizProjeto / ".gitignore",    Templates::Projeto::GITIGNORE);
     }
 
-    bool criarProjeto(
-        const std::filesystem::path& DirBase,
-        std::string_view NomeProjeto,
-        std::string* ErroSaida
-    ) {
+    bool criarProjeto(const std::filesystem::path& DirBase, std::string_view NomeProjeto, std::string* ErroSaida) {
         try {
             const std::filesystem::path RAIZ_PROJETO{DirBase / std::filesystem::path{NomeProjeto}};
 

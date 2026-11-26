@@ -13,6 +13,7 @@ PROPOSITO: Ponto de entrada da CLI cpp-bootstrap, orquestracao do fluxo e banner
 //=========================== [ CABECALHOS DO PROJETO ] ========================
 
 #include "cli.hpp"
+#include "cores.hpp"
 #include "generator.hpp"
 #include "terminal.hpp"
 #include "validator.hpp"
@@ -21,43 +22,31 @@ PROPOSITO: Ponto de entrada da CLI cpp-bootstrap, orquestracao do fluxo e banner
 
 namespace App::Banner {
 
-    inline constexpr std::string_view URL_GITHUB{"https://github.com/kbelx"};
-    inline constexpr std::string_view URL_LINKEDIN{"https://www.linkedin.com/in/brunocosta-dev/"};
+    inline constexpr std::string_view URL_GITHUB   {"https://github.com/kbelx"};
+    inline constexpr std::string_view URL_LINKEDIN {"https://www.linkedin.com/in/brunocosta-dev/"};
 
     [[nodiscard]] std::string formatarLinkOsc8(std::string_view Url) {
-        return std::string{Terminal::Cores::ESC} + "]8;;" + std::string{Url} +
-               std::string{Terminal::Cores::ESC} + "\\" +
-               Terminal::Saida::colorirTexto(Terminal::Cores::AZUL, Url) +
-               std::string{Terminal::Cores::ESC} + "]8;;" +
-               std::string{Terminal::Cores::ESC} + "\\";
+        return std::string{Cores::ESC} + "]8;;" + std::string{Url} +
+               std::string{Cores::ESC} + "\\" +
+               Terminal::Saida::colorirTexto(Cores::AZUL, Url) +
+               std::string{Cores::ESC} + "]8;;" +
+               std::string{Cores::ESC} + "\\";
     }
 
     void exibirProximosPassos(std::string_view NomeProjeto) {
-        Terminal::Saida::imprimirColorido(Terminal::Cores::CIANO, "Proximos passos:");
-        Terminal::Saida::imprimirLinha(
-            "  1 - Entre na pasta:   " +
-            Terminal::Saida::colorirTexto(Terminal::Cores::AZUL, "cd " + std::string{NomeProjeto})
-        );
-        Terminal::Saida::imprimirLinha(
-            "  2 - Abra no VS Code:  " +
-            Terminal::Saida::colorirTexto(Terminal::Cores::AZUL, "code .")
-        );
-        Terminal::Saida::imprimirLinha(
-            "  3 - Configure CMake:  " +
-            Terminal::Saida::colorirTexto(Terminal::Cores::AZUL, "cmake -B build")
-        );
-        Terminal::Saida::imprimirLinha(
-            "  4 - Compile:          " +
-            Terminal::Saida::colorirTexto(Terminal::Cores::AZUL, "cmake --build build")
-        );
+        Terminal::Saida::imprimirColorido(Cores::CIANO, "Proximos passos:");
+        Terminal::Saida::imprimirLinha("  1 - Entre na pasta:   " + Terminal::Saida::colorirTexto(Cores::AZUL, "cd " + std::string{NomeProjeto}));
+        Terminal::Saida::imprimirLinha("  2 - Abra no VS Code:  " + Terminal::Saida::colorirTexto(Cores::AZUL, "code ."));
+        Terminal::Saida::imprimirLinha("  3 - Configure CMake:  " + Terminal::Saida::colorirTexto(Cores::AZUL, "cmake -B build"));
+        Terminal::Saida::imprimirLinha("  4 - Compile:          " + Terminal::Saida::colorirTexto(Cores::AZUL, "cmake --build build"));
     }
 
     void exibirRodapeAutor() {
         Terminal::Saida::separador();
-        Terminal::Saida::imprimirLinha(
-            Terminal::Saida::colorirTexto(Terminal::Cores::CIANO, "Autor:") +
+
+        Terminal::Saida::imprimirLinha(Terminal::Saida::colorirTexto(Cores::CIANO, "Autor:") +
             " Bruno Costa (" +
-            Terminal::Saida::colorirTexto(Terminal::Cores::AZUL, "aka kbelx") +
+            Terminal::Saida::colorirTexto(Cores::AZUL, "aka kbelx") +
             ")"
         );
 
@@ -76,7 +65,7 @@ namespace App::Banner {
         Terminal::Saida::separador();
         Terminal::Saida::imprimirLinha(
             "[OK] Projeto " +
-            Terminal::Saida::colorirTexto(Terminal::Cores::VERDE, "'" + std::string{NomeProjeto} + "'") +
+            Terminal::Saida::colorirTexto(Cores::VERDE, "'" + std::string{NomeProjeto} + "'") +
             " criado com sucesso!"
         );
         Terminal::Saida::imprimirLinha("");
@@ -85,7 +74,7 @@ namespace App::Banner {
 
         Terminal::Saida::imprimirLinha("");
         Terminal::Saida::imprimirLinha(
-            Terminal::Saida::colorirTexto(Terminal::Cores::CIANO, "Sistema detectado:") +
+            Terminal::Saida::colorirTexto(Cores::CIANO, "Sistema detectado:") +
             " " +
             std::string{Terminal::Ambiente::detectarSO()}
         );
@@ -128,7 +117,8 @@ namespace App::Fluxo {
 //============================ [ PONTO DE ENTRADA ] ============================
 
 int main(int QtdArgs, char* VetorArgs[]) {
-    const CLI::Opcoes OPCOES_CLI{CLI::Parser::analisarArgs(QtdArgs, VetorArgs)};
+
+    const CLI::Opcoes OPCOES_CLI { CLI::Parser::analisarArgs(QtdArgs, VetorArgs) };
 
     switch (OPCOES_CLI.AcaoEscolhida) {
         case CLI::Acao::EXIBIR_ERRO_TUTORIAL:
