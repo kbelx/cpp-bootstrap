@@ -4,7 +4,8 @@ Módulos da versão `v1.0.0` (C++23).
 
 | Módulo | Arquivos | Namespaces |
 | :--- | :--- | :--- |
-| [terminal](terminal.md) | `include/terminal.hpp` | `Terminal::{Cores, Ambiente, Saida}` |
+| [cores](cores.md) | `include/cores.hpp` | `Cores` |
+| [terminal](terminal.md) | `include/terminal.hpp` | `Terminal::{Ambiente, Saida}` |
 | [cli](cli.md) | `include/cli.hpp`, `src/cli.cpp` | `CLI::{Parser, Telas, Auxiliar}` |
 | [validator](validator.md) | `include/validator.hpp`, `src/validator.cpp` | `Validadores::{Caracteres, Regras, Diagnostico}` |
 | [templates](templates.md) | `include/templates.hpp` | `Templates::{VSCode, Projeto, Render}` |

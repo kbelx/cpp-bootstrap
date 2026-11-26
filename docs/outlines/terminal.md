@@ -1,10 +1,7 @@
 # Outline — `terminal`
 
-- **Header:** [terminal.hpp](../../include/terminal.hpp) *(header-only)*
+- **Header:** [terminal.hpp](../../include/terminal.hpp) *(header-only, utiliza `Cores` de [cores.hpp](../../include/cores.hpp))*
 - **Propósito:** Detecção de SO, suporte ANSI/VT e saída colorida no terminal.
-
-## `Terminal::Cores`
-- `ESC`, `RESET`, `VERDE`, `CIANO`, `AZUL`, `CINZA`, `AMARELO`, `VERMELHO`, `NEGRITO` (`inline constexpr std::string_view`).
 
 ## `Terminal::Ambiente`
 - `detectarSO()` — retorna `"Windows"`, `"macOS"` ou `"Linux"` em tempo de compilação.

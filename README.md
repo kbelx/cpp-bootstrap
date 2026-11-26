@@ -90,7 +90,8 @@ cpp-bootstrap/
 │   ├── ci.yml                     # CI multiplataforma (Ubuntu, Windows MSVC/MSYS2, macOS)
 │   └── release.yml                # Publicacao automatica de Releases em tags v*
 ├── include/
-│   ├── terminal.hpp               # Terminal::{Cores, Ambiente, Saida}
+│   ├── cores.hpp                  # Cores (paleta de sequencias ANSI header-only)
+│   ├── terminal.hpp               # Terminal::{Ambiente, Saida}
 │   ├── cli.hpp                    # CLI::{VERSAO, Acao, Opcoes, Parser, Telas}
 │   ├── validator.hpp              # Validadores::validarNomeProjeto
 │   ├── templates.hpp              # Templates::{VSCode, Projeto, Render}
